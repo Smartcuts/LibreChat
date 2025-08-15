@@ -363,7 +363,7 @@ function createToolInstance({ res, toolName, serverName, toolDefinition, provide
       // Listen for tool notifications
       const onprogress = (
         /** @type {ProgressNotification} */
-        { progress, total, mimeType, data: { chunk, chunkIndex, isFinal } },
+        { progress, total, mimeType, data: { chunk, streamMode = 'append', isFinal } },
       ) => {
         const toolId = toolCall?.id;
         /** @type {ToolCallResultDeltaEvent} */
@@ -375,8 +375,8 @@ function createToolInstance({ res, toolName, serverName, toolDefinition, provide
           total,
           mimeType,
           isFinal,
-          chunkIndex,
           chunk,
+          streamMode,
         };
         // Send the event - it will be received as data.event = 'on_tool_result_delta'
         sendEvent(res, {

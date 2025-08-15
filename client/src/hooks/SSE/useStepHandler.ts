@@ -289,6 +289,7 @@ export default function useStepHandler({
           mimeType,
           isFinal,
           chunk,
+          streamMode = 'append',
         } = data as Agents.ToolCallResultDeltaEvent;
 
         // Find the message containing this tool call
@@ -323,9 +324,15 @@ export default function useStepHandler({
             isComplete: false,
           };
 
-          // Store chunks with their progress metadata for proper ordering
-          // Each chunk is stored as an object with progress and data
-          const newChunks = [...existingStreamingData.chunks];
+          // Handle chunks based on streamMode
+          let newChunks: typeof existingStreamingData.chunks;
+          if (streamMode === 'overwrite') {
+            // Overwrite mode: replace all chunks with the new one
+            newChunks = [];
+          } else {
+            // Append mode (default): keep existing chunks
+            newChunks = [...existingStreamingData.chunks];
+          }
 
           // Add the new chunk with its progress value
           const chunkEntry: ChunkEntry<string> = {

@@ -68,7 +68,7 @@ export namespace Agents {
     expires_at?: number;
     /** Streaming data for progressive tool results */
     streaming_data?: {
-      mimeType: string;
+      mimeType?: string;
       chunks: Array<{
         progress: number;
         data: unknown;
@@ -286,9 +286,10 @@ export namespace Agents {
     toolId: string;
     progress: number;
     total?: number;
-    mimeType: string;
+    mimeType?: string;
     isFinal: boolean;
     chunk: string;
+    streamMode?: 'append' | 'overwrite';
   };
 }
 
