@@ -43,6 +43,12 @@ type MessageDeltaUpdate = { type: ContentTypes.TEXT; text: string; tool_call_ids
 
 type ReasoningDeltaUpdate = { type: ContentTypes.THINK; think: string };
 
+type ChunkEntry<TChunk> = {
+  progress: number;
+  data: TChunk;
+  timestamp: number;
+};
+
 type AllContentTypes =
   | ContentTypes.TEXT
   | ContentTypes.THINK
@@ -322,7 +328,7 @@ export default function useStepHandler({
           const newChunks = [...existingStreamingData.chunks];
 
           // Add the new chunk with its progress value
-          const chunkEntry = {
+          const chunkEntry: ChunkEntry<string> = {
             progress: progress || 0,
             data: chunk,
             timestamp: Date.now(),
@@ -359,9 +365,10 @@ export default function useStepHandler({
 
           // Update output if this is the final chunk
           if (isFinal) {
+            // For other types, combine as before
             const combinedOutput = newChunks
-              .filter((c: any) => c && c.data !== undefined)
-              .map((c: any) => {
+              .filter((c: ChunkEntry<unknown>) => c && c.data !== undefined)
+              .map((c: ChunkEntry<unknown>) => {
                 const data = c.data;
                 return typeof data === 'string' ? data : JSON.stringify(data);
               })
