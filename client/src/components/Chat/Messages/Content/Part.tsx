@@ -10,6 +10,7 @@ import { memo } from 'react';
 import type { TMessageContentParts, TAttachment } from 'librechat-data-provider';
 import { OpenAIImageGen, EmptyText, Reasoning, ExecuteCode, AgentUpdate, Text } from './Parts';
 import { ErrorMessage } from './MessageContent';
+import StreamingToolCall from './StreamingToolCall';
 import RetrievalCall from './RetrievalCall';
 import AgentHandoff from './AgentHandoff';
 import CodeAnalyze from './CodeAnalyze';
@@ -131,6 +132,22 @@ const Part = memo(
             args={toolCall.args ?? ''}
             name={toolCall.name || ''}
             output={toolCall.output ?? ''}
+          />
+        );
+      } else if (
+        isToolCall &&
+        // Show StreamingToolCall for tools that are streaming or have streaming data
+        (toolCall.streaming_data || toolCall.progress)
+      ) {
+        return (
+          <StreamingToolCall
+            args={toolCall.args ?? ''}
+            name={toolCall.name || ''}
+            output={toolCall.output}
+            initialProgress={toolCall.progress ?? 0.1}
+            isSubmitting={isSubmitting}
+            attachments={attachments}
+            streamingData={toolCall.streaming_data}
           />
         );
       } else if (isToolCall) {

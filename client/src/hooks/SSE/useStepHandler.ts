@@ -372,19 +372,45 @@ export default function useStepHandler({
 
           // Update output if this is the final chunk
           if (isFinal) {
-            // For other types, combine as before
-            const combinedOutput = newChunks
-              .filter((c: ChunkEntry<unknown>) => c && c.data !== undefined)
-              .map((c: ChunkEntry<unknown>) => {
-                const data = c.data;
-                return typeof data === 'string' ? data : JSON.stringify(data);
-              })
-              .join('');
+            // Check the mimeType from the streaming data OR the event
+            const streamMimeType = newStreamingData.mimeType || mimeType;
 
-            updatedToolCall = {
-              ...updatedToolCall,
-              output: combinedOutput,
-            };
+            // For CSV data, create a structured output
+            if (streamMimeType === 'text/csv' || streamMimeType === 'application/csv') {
+              const csvRows = newChunks
+                .filter((c: ChunkEntry<unknown>) => c && c.data !== undefined)
+                .map((c: ChunkEntry<unknown>) => {
+                  const data = c.data;
+                  return typeof data === 'string' ? data : JSON.stringify(data);
+                });
+
+              // Create structured output for CSV
+              const structuredOutput = JSON.stringify({
+                status: 'completed',
+                csv_data: csvRows,
+                mimeType: streamMimeType,
+                total_rows: csvRows.length,
+              });
+
+              updatedToolCall = {
+                ...updatedToolCall,
+                output: structuredOutput,
+              };
+            } else {
+              // For other types, combine as before
+              const combinedOutput = newChunks
+                .filter((c: ChunkEntry<unknown>) => c && c.data !== undefined)
+                .map((c: ChunkEntry<unknown>) => {
+                  const data = c.data;
+                  return typeof data === 'string' ? data : JSON.stringify(data);
+                })
+                .join('');
+
+              updatedToolCall = {
+                ...updatedToolCall,
+                output: combinedOutput,
+              };
+            }
           }
 
           // Create new ToolCallContent with updated tool_call
