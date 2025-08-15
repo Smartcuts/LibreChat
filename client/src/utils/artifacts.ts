@@ -9,6 +9,7 @@ const artifactFilename = {
   'application/vnd.react': 'App.tsx',
   'text/html': 'index.html',
   'application/vnd.code-html': 'index.html',
+  'application/vnd.data-table': 'DataTable.tsx',
   // mermaid and markdown types are handled separately in useArtifactProps.ts
   default: 'index.html',
   // 'css': 'css',
@@ -33,6 +34,7 @@ const artifactTemplate: Record<
   'text/markdown': 'react-ts',
   'text/md': 'react-ts',
   'text/plain': 'react-ts',
+  'application/vnd.data-table': 'react-ts',
   default: 'static',
   // 'css': 'css',
   // 'javascript': 'js',
@@ -124,6 +126,7 @@ const dependenciesMap: Record<
   'text/markdown': markdownDependencies,
   'text/md': markdownDependencies,
   'text/plain': markdownDependencies,
+  'application/vnd.data-table': standardDependencies,
   default: standardDependencies,
 };
 

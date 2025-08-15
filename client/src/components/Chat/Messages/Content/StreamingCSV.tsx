@@ -1,7 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
-import { CheckCircle, Download, FileText } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { CheckCircle, Download, FileText, Maximize2 } from 'lucide-react';
+import { useRecoilValue } from 'recoil';
 import { Button } from '@librechat/client';
 import type { Agents } from 'librechat-data-provider';
+import { useMessageContext } from '~/Providers';
+import { useStreamingArtifact } from '~/hooks/useStreamingArtifact';
+import { artifactsVisibility } from '~/store/artifacts';
 import CSVTable from './CSVTable';
 import { cn } from '~/utils';
 
@@ -18,6 +22,7 @@ interface StreamingCSVProps {
   streamingData?: Agents.ToolCall['streaming_data'];
   output?: string;
   maxRows?: number;
+  toolName?: string;
 }
 
 // Helper function to format file size
@@ -63,10 +68,24 @@ function normalizeCSVRows(rows: string[]): string[] {
   });
 }
 
-export default function StreamingCSV({ streamingData, output, maxRows = 15 }: StreamingCSVProps) {
+export default function StreamingCSV({
+  streamingData,
+  output,
+  maxRows = 15,
+  toolName = 'CSV Data',
+}: StreamingCSVProps) {
   const [csvRows, setCsvRows] = useState<string[]>([]);
   const [fileMetadata, setFileMetadata] = useState<FileMetadata | null>(null);
   const [rowCount, setRowCount] = useState(0);
+  const artifactIdRef = useRef<string | null>(null);
+
+  const { messageId } = useMessageContext();
+  const {
+    createDataArtifact,
+    updateDataArtifact,
+    artifactIdRef: globalArtifactIdRef,
+  } = useStreamingArtifact();
+  const isArtifactsVisible = useRecoilValue(artifactsVisibility);
 
   // Parse output for file metadata and initial data
   const parsedOutput = useMemo(() => {
@@ -145,9 +164,43 @@ export default function StreamingCSV({ streamingData, output, maxRows = 15 }: St
       if (normalizedRows.length > 0) {
         setCsvRows(normalizedRows);
         setRowCount(normalizedRows.length);
+
+        // Update artifact if it exists
+        if (artifactIdRef.current && isArtifactsVisible) {
+          // Parse CSV rows to extract headers and data
+          let headers: string[] = [];
+          let rows: Array<Array<string | number | boolean | null>> = [];
+
+          if (normalizedRows.length > 0) {
+            headers = normalizedRows[0].split(',').map((h) => h.trim());
+            rows = normalizedRows.slice(1).map((row) => {
+              return row.split(',').map((cell) => {
+                const trimmed = cell.trim();
+                if (!isNaN(Number(trimmed)) && trimmed !== '') {
+                  return Number(trimmed);
+                }
+                if (trimmed.toLowerCase() === 'true') return true;
+                if (trimmed.toLowerCase() === 'false') return false;
+                if (trimmed === 'null' || trimmed === '') return null;
+                return trimmed;
+              });
+            });
+          }
+
+          updateDataArtifact(artifactIdRef.current, {
+            content: JSON.stringify({ headers, rows }, null, 2),
+            data: {
+              headers,
+              rows,
+              totalRows: streamingData?.total || rows.length,
+              mimeType: streamingData?.mimeType || 'text/csv',
+              metadata: fileMetadata ? { ...fileMetadata } : undefined,
+            },
+          });
+        }
       }
     }
-  }, [streamingData]);
+  }, [streamingData, fileMetadata, updateDataArtifact, isArtifactsVisible]);
 
   // Handle completed state with file metadata from output
   useEffect(() => {
@@ -178,6 +231,34 @@ export default function StreamingCSV({ streamingData, output, maxRows = 15 }: St
   const isComplete = streamingData?.isComplete || parsedOutput?.status === 'completed';
   const totalRows = streamingData?.total || fileMetadata?.rows || rowCount;
 
+  // Reset artifact state when panel closes
+  useEffect(() => {
+    if (!isArtifactsVisible && artifactIdRef.current) {
+      artifactIdRef.current = null;
+    }
+  }, [isArtifactsVisible]);
+
+  // Handle artifact creation for large datasets
+  const handleViewFullData = () => {
+    if (csvRows.length > 0) {
+      const artifact = createDataArtifact({
+        streamingData,
+        output,
+        toolName,
+        messageId,
+        csvRows,
+        metadata: fileMetadata ? { ...fileMetadata } : undefined,
+      });
+      artifactIdRef.current = artifact.id;
+    }
+  };
+
+  // Check if artifact is created and panel is open
+  const isArtifactActive = artifactIdRef.current && isArtifactsVisible;
+
+  // Check if we should show the "View Full Data" button
+  const shouldShowFullDataButton = csvRows.length > maxRows + 1; // +1 for header
+
   // Don't return null if we have streaming data, even if csvRows is empty momentarily
   if (!streamingData && !parsedOutput && csvRows.length === 0) {
     return null;
@@ -189,11 +270,27 @@ export default function StreamingCSV({ streamingData, output, maxRows = 15 }: St
       {csvRows.length > 0 ? (
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h4 className="text-sm font-semibold">Data Preview</h4>
-            <span className="text-xs text-text-tertiary">
-              {csvRows.length - 1} rows loaded
-              {totalRows && totalRows > csvRows.length && ` of ${totalRows} total`}
-            </span>
+            <h4 className="text-sm font-semibold">
+              {shouldShowFullDataButton ? 'Data Preview (First 15 rows)' : 'Data'}
+            </h4>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-tertiary">
+                {csvRows.length - 1} rows loaded
+                {totalRows && totalRows > csvRows.length && ` of ${totalRows} total`}
+              </span>
+              {shouldShowFullDataButton && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleViewFullData}
+                  className="gap-1"
+                  disabled={!!isArtifactActive}
+                >
+                  <Maximize2 className="h-3 w-3" />
+                  {isArtifactActive ? 'Viewing in Artifact' : 'View Full Data'}
+                </Button>
+              )}
+            </div>
           </div>
           <CSVTable data={csvRows} maxRows={maxRows} />
         </div>

@@ -10,6 +10,8 @@ import { useAutoScroll } from '~/hooks/Artifacts/useAutoScroll';
 import { ArtifactCodeEditor } from './ArtifactCodeEditor';
 import { useGetStartupConfig } from '~/data-provider';
 import { ArtifactPreview } from './ArtifactPreview';
+import DataTableArtifact from './DataTableArtifact';
+import { cn } from '~/utils';
 
 export default function ArtifactTabs({
   artifact,
@@ -39,6 +41,22 @@ export default function ArtifactTabs({
   useAutoScroll({ ref: contentRef, content, isSubmitting });
 
   const { files, fileKey, template, sharedProps } = useArtifactProps({ artifact });
+
+  // Check if this is a data table artifact
+  const isDataTable = artifact.type === 'application/vnd.data-table';
+
+  if (isDataTable) {
+    return (
+      <>
+        <Tabs.Content value="code" id="artifacts-code" className={cn('flex-grow overflow-auto')}>
+          <DataTableArtifact artifact={artifact} />
+        </Tabs.Content>
+        <Tabs.Content value="preview" className={cn('flex-grow overflow-auto')}>
+          <DataTableArtifact artifact={artifact} />
+        </Tabs.Content>
+      </>
+    );
+  }
 
   return (
     <div className="flex h-full w-full flex-col">

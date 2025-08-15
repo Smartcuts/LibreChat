@@ -94,7 +94,7 @@ export default function StreamingToolCall({
     switch (mimeType?.toLowerCase()) {
       case 'text/csv':
       case 'application/csv':
-        return <StreamingCSV streamingData={propStreamingData} output={output} />;
+        return <StreamingCSV streamingData={propStreamingData} output={output} toolName={name} />;
 
       case 'application/json':
       case 'text/json':
