@@ -66,6 +66,18 @@ export namespace Agents {
     auth?: string;
     /** Expiration time */
     expires_at?: number;
+    /** Streaming data for progressive tool results */
+    streaming_data?: {
+      mimeType: string;
+      chunks: Array<{
+        progress: number;
+        data: unknown;
+        timestamp: number;
+      }>;
+      progress: number;
+      total?: number;
+      isComplete: boolean;
+    };
   };
 
   export type ToolEndEvent = {
@@ -267,6 +279,17 @@ export namespace Agents {
     | ContentTypes.TEXT
     | ContentTypes.IMAGE_URL
     | string;
+
+  export type ToolCallResultDeltaEvent = {
+    user?: string;
+    toolName: string;
+    toolId: string;
+    progress: number;
+    total?: number;
+    mimeType: string;
+    isFinal: boolean;
+    chunk: string;
+  };
 }
 
 export type ToolCallResult = {

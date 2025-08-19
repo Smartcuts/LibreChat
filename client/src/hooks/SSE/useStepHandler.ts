@@ -32,6 +32,7 @@ type TStepEvent = {
     | Agents.AgentUpdate
     | Agents.RunStep
     | Agents.ToolEndEvent
+    | Agents.ToolCallResultDeltaEvent
     | {
         runId?: string;
         message: string;
@@ -268,6 +269,127 @@ export default function useStepHandler({
           messageMap.current.set(responseMessageId, updatedResponse);
           const updatedMessages = messages.map((msg) =>
             msg.messageId === responseMessageId ? updatedResponse : msg,
+          );
+
+          setMessages(updatedMessages);
+        }
+      } else if (event === 'on_tool_result_delta') {
+        const {
+          user: _user,
+          toolName: _toolName,
+          toolId,
+          progress,
+          total,
+          mimeType,
+          isFinal,
+          chunk,
+        } = data as Agents.ToolCallResultDeltaEvent;
+
+        // Find the message containing this tool call
+        const currentMessages = getMessages() || [];
+        let targetMessage: TMessage | undefined;
+        let targetContentIndex = -1;
+
+        for (const msg of currentMessages) {
+          if (msg.content) {
+            const index = msg.content.findIndex(
+              (c) => c?.type === ContentTypes.TOOL_CALL && c.tool_call?.id === toolId,
+            );
+            if (index !== -1) {
+              targetMessage = msg;
+              targetContentIndex = index;
+              break;
+            }
+          }
+        }
+
+        if (targetMessage && targetContentIndex !== -1) {
+          const updatedMessage = { ...targetMessage };
+          const updatedContent = [...(updatedMessage.content || [])] as TMessageContentParts[];
+          const toolCallContent = updatedContent[targetContentIndex] as Agents.ToolCallContent;
+          const existingToolCall = toolCallContent?.tool_call;
+
+          // Create new streaming_data object (immutable update)
+          const existingStreamingData = existingToolCall?.streaming_data || {
+            chunks: [],
+            progress,
+            total,
+            isComplete: false,
+          };
+
+          // Store chunks with their progress metadata for proper ordering
+          // Each chunk is stored as an object with progress and data
+          const newChunks = [...existingStreamingData.chunks];
+
+          // Add the new chunk with its progress value
+          const chunkEntry = {
+            progress: progress || 0,
+            data: chunk,
+            timestamp: Date.now(),
+          };
+
+          // Append the new chunk entry
+          newChunks.push(chunkEntry);
+
+          // Sort chunks by progress to maintain order
+          // This ensures chunks are in the correct sequence even if they arrive out of order
+          newChunks.sort((a, b) => {
+            // First sort by progress if available
+            if (a.progress !== b.progress) {
+              return a.progress - b.progress;
+            }
+            // If progress is the same, sort by timestamp (order received)
+            return a.timestamp - b.timestamp;
+          });
+
+          // Create new streaming_data object
+          const newStreamingData: Agents.ToolCall['streaming_data'] = {
+            mimeType,
+            chunks: newChunks,
+            progress,
+            total,
+            isComplete: isFinal || existingStreamingData.isComplete,
+          };
+
+          // Create new tool_call object with updated streaming_data
+          let updatedToolCall: Agents.ToolCall = {
+            ...existingToolCall,
+            streaming_data: newStreamingData,
+          } as Agents.ToolCall;
+
+          // Update output if this is the final chunk
+          if (isFinal) {
+            const combinedOutput = newChunks
+              .filter((c: any) => c && c.data !== undefined)
+              .map((c: any) => {
+                const data = c.data;
+                return typeof data === 'string' ? data : JSON.stringify(data);
+              })
+              .join('');
+
+            updatedToolCall = {
+              ...updatedToolCall,
+              output: combinedOutput,
+            };
+          }
+
+          // Create new ToolCallContent with updated tool_call
+          const updatedToolCallContent: Agents.ToolCallContent = {
+            ...toolCallContent,
+            tool_call: updatedToolCall,
+          };
+
+          // Update the content array
+          updatedContent[targetContentIndex] = updatedToolCallContent as TMessageContentParts;
+          updatedMessage.content = updatedContent;
+
+          // Update the message in the map and state
+          if (updatedMessage.messageId) {
+            messageMap.current.set(updatedMessage.messageId, updatedMessage);
+          }
+
+          const updatedMessages = currentMessages.map((msg) =>
+            msg.messageId === updatedMessage.messageId ? updatedMessage : msg,
           );
 
           setMessages(updatedMessages);

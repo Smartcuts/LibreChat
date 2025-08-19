@@ -360,6 +360,31 @@ function createToolInstance({ res, toolName, serverName, toolDefinition, provide
       const customUserVars =
         config?.configurable?.userMCPAuthMap?.[`${Constants.mcp_prefix}${serverName}`];
 
+      // Listen for tool notifications
+      const onprogress = (
+        /** @type {ProgressNotification} */
+        { progress, total, mimeType, data: { chunk, chunkIndex, isFinal } },
+      ) => {
+        const toolId = toolCall?.id;
+        /** @type {ToolCallResultDeltaEvent} */
+        const data = {
+          user: config?.configurable?.user,
+          toolName,
+          toolId,
+          progress,
+          total,
+          mimeType,
+          isFinal,
+          chunkIndex,
+          chunk,
+        };
+        // Send the event - it will be received as data.event = 'on_tool_result_delta'
+        sendEvent(res, {
+          event: 'on_tool_result_delta',
+          data,
+        });
+      };
+
       const result = await mcpManager.callTool({
         serverName,
         toolName,
@@ -367,6 +392,8 @@ function createToolInstance({ res, toolName, serverName, toolDefinition, provide
         toolArguments,
         options: {
           signal: derivedSignal,
+          resetTimeoutOnProgress: true,
+          onprogress,
         },
         user: config?.configurable?.user,
         requestBody: config?.configurable?.requestBody,
