@@ -139,6 +139,10 @@ const Part = memo(
         // Show StreamingToolCall for tools that are streaming or have streaming data
         (toolCall.streaming_data || toolCall.progress)
       ) {
+        // Check if the output indicates an error
+        const hasError =
+          toolCall.output?.toLowerCase().includes('error') ||
+          toolCall.output?.toLowerCase().includes('fail');
         return (
           <StreamingToolCall
             args={toolCall.args ?? ''}
@@ -148,6 +152,7 @@ const Part = memo(
             isSubmitting={isSubmitting}
             attachments={attachments}
             streamingData={toolCall.streaming_data}
+            error={hasError}
           />
         );
       } else if (isToolCall) {

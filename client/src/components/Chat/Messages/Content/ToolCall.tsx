@@ -59,7 +59,8 @@ export default function ToolCall({
   }, [name]);
 
   const error =
-    typeof output === 'string' && output.toLowerCase().includes('error processing tool');
+    typeof output === 'string' &&
+    (output.toLowerCase().includes('error') || output.toLowerCase().includes('fail'));
 
   const args = useMemo(() => {
     if (typeof _args === 'string') {
@@ -102,6 +103,15 @@ export default function ToolCall({
   const cancelled = (!isSubmitting && progress < 1) || error === true;
 
   const getFinishedText = () => {
+    if (error) {
+      if (isMCPToolCall === true || function_name) {
+        return localize('com_assistants_failed_function', { 0: function_name });
+      }
+      if (domain != null && domain && domain.length !== Constants.ENCODED_DOMAIN_LENGTH) {
+        return localize('com_assistants_failed_action', { 0: domain });
+      }
+      return localize('com_ui_action_failed');
+    }
     if (cancelled) {
       return localize('com_ui_cancelled');
     }

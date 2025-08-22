@@ -18,6 +18,7 @@ export default function StreamingToolCall({
   attachments,
   onComplete,
   streamingData: propStreamingData,
+  error = false,
 }: {
   initialProgress: number;
   isSubmitting: boolean;
@@ -31,6 +32,8 @@ export default function StreamingToolCall({
   onComplete?: (data: any) => void;
   // streaming data from tool result deltas
   streamingData?: Agents.ToolCall['streaming_data'];
+  // whether the tool call failed
+  error?: boolean;
 }) {
   const localize = useLocalize();
   const [showInfo, setShowInfo] = useState(false);
@@ -146,6 +149,10 @@ export default function StreamingToolCall({
 
   // Get status text
   const getStatusText = () => {
+    if (error) {
+      return 'Failed';
+    }
+
     const streaming = propStreamingData && !propStreamingData.isComplete;
     const complete = propStreamingData?.isComplete;
     const progressValue = propStreamingData?.progress || 0;
@@ -175,10 +182,14 @@ export default function StreamingToolCall({
           progress={progress}
           onClick={() => setShowInfo((prev) => !prev)}
           inProgressText={localize('com_assistants_running_var', { 0: name })}
-          finishedText={localize('com_assistants_completed_function', { 0: name })}
+          finishedText={
+            error
+              ? localize('com_assistants_failed_function', { 0: name })
+              : localize('com_assistants_completed_function', { 0: name })
+          }
           hasInput={true}
           isExpanded={showInfo}
-          error={false}
+          error={error}
         />
         {showInfo && args && (
           <div className="mt-2">
@@ -202,7 +213,9 @@ export default function StreamingToolCall({
                 {name}
               </span>
             </div>
-            <span className="text-xs text-text-tertiary">{getStatusText()}</span>
+            <span className={`text-xs ${error ? 'text-red-500' : 'text-text-tertiary'}`}>
+              {getStatusText()}
+            </span>
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={() => setShowInfo(!showInfo)} className="gap-1">
