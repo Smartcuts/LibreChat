@@ -56,8 +56,24 @@ export default function StreamingJSON({ streamingData, output, className }: Stre
   useEffect(() => {
     if (!streamingData && output) {
       try {
-        const parsed = JSON.parse(output);
-        setCombinedJSON(parsed);
+        // Handle structured output format from Anthropic models: [{"type": "text", "text": "..."}]
+        let contentToCheck = output;
+        try {
+          const parsed = JSON.parse(output);
+          if (
+            Array.isArray(parsed) &&
+            parsed.length > 0 &&
+            parsed[0]?.type === 'text' &&
+            parsed[0]?.text
+          ) {
+            contentToCheck = parsed[0].text;
+          }
+        } catch {
+          contentToCheck = output;
+        }
+
+        const jsonContent = JSON.parse(contentToCheck);
+        setCombinedJSON(jsonContent);
       } catch {
         // Not valid JSON, ignore
       }

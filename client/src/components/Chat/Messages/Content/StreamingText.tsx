@@ -51,7 +51,23 @@ export default function StreamingText({ streamingData, output, className }: Stre
   // Use output if no streaming data
   useEffect(() => {
     if (!streamingData && output) {
-      setTextContent(output);
+      // Handle structured output format from Anthropic models: [{"type": "text", "text": "..."}]
+      let contentToCheck = output;
+      try {
+        const parsed = JSON.parse(output);
+        if (
+          Array.isArray(parsed) &&
+          parsed.length > 0 &&
+          parsed[0]?.type === 'text' &&
+          parsed[0]?.text
+        ) {
+          contentToCheck = parsed[0].text;
+        }
+      } catch {
+        contentToCheck = output;
+      }
+
+      setTextContent(contentToCheck);
     }
   }, [output, streamingData]);
 

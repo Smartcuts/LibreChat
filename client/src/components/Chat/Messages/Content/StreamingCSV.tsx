@@ -91,7 +91,23 @@ export default function StreamingCSV({
   const parsedOutput = useMemo(() => {
     if (!output) return null;
     try {
-      return JSON.parse(output);
+      // Handle structured output format from Anthropic models: [{"type": "text", "text": "..."}]
+      let contentToCheck = output;
+      try {
+        const parsed = JSON.parse(output);
+        if (
+          Array.isArray(parsed) &&
+          parsed.length > 0 &&
+          parsed[0]?.type === 'text' &&
+          parsed[0]?.text
+        ) {
+          contentToCheck = parsed[0].text;
+        }
+      } catch {
+        contentToCheck = output;
+      }
+
+      return JSON.parse(contentToCheck);
     } catch {
       return null;
     }
@@ -218,7 +234,23 @@ export default function StreamingCSV({
       }
     } else if (!streamingData && output && typeof output === 'string') {
       // Handle raw CSV output when no streaming data and output is not JSON
-      const lines = output.split(/\r?\n/).filter((line) => line.trim() !== '');
+      // First check if it's wrapped in Anthropic format
+      let contentToCheck = output;
+      try {
+        const parsed = JSON.parse(output);
+        if (
+          Array.isArray(parsed) &&
+          parsed.length > 0 &&
+          parsed[0]?.type === 'text' &&
+          parsed[0]?.text
+        ) {
+          contentToCheck = parsed[0].text;
+        }
+      } catch {
+        contentToCheck = output;
+      }
+
+      const lines = contentToCheck.split(/\r?\n/).filter((line) => line.trim() !== '');
       if (lines.length > 0) {
         setCsvRows(lines);
         setRowCount(lines.length);

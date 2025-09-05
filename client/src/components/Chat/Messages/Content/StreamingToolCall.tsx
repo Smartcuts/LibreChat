@@ -58,8 +58,24 @@ export default function StreamingToolCall({
 
     // If no streaming data but we have output, try to infer the type
     if (!mimeType && output) {
+      // First, handle structured output format from Anthropic models: [{"type": "text", "text": "..."}]
+      let contentToCheck = output;
       try {
         const parsed = JSON.parse(output);
+        if (
+          Array.isArray(parsed) &&
+          parsed.length > 0 &&
+          parsed[0]?.type === 'text' &&
+          parsed[0]?.text
+        ) {
+          contentToCheck = parsed[0].text;
+        }
+      } catch {
+        contentToCheck = output;
+      }
+
+      try {
+        const parsed = JSON.parse(contentToCheck);
         // Check if it looks like CSV data
         if (
           parsed.csv_data ||
@@ -72,8 +88,8 @@ export default function StreamingToolCall({
         }
       } catch {
         // Check if it's raw CSV data (starts with headers and has comma-separated values)
-        if (output && typeof output === 'string') {
-          const lines = output.split('\n');
+        if (contentToCheck && typeof contentToCheck === 'string') {
+          const lines = contentToCheck.split('\n');
           if (lines.length > 1 && lines[0].includes(',')) {
             // Looks like CSV - check if all lines have similar comma counts
             const firstLineCommas = (lines[0].match(/,/g) || []).length;
@@ -123,8 +139,24 @@ export default function StreamingToolCall({
 
     // If no streaming data, try to infer from output
     if (!mimeType && output) {
+      // Handle structured output format from Anthropic models
+      let contentToCheck = output;
       try {
         const parsed = JSON.parse(output);
+        if (
+          Array.isArray(parsed) &&
+          parsed.length > 0 &&
+          parsed[0]?.type === 'text' &&
+          parsed[0]?.text
+        ) {
+          contentToCheck = parsed[0].text;
+        }
+      } catch {
+        contentToCheck = output;
+      }
+
+      try {
+        const parsed = JSON.parse(contentToCheck);
         if (parsed.csv_data || parsed.file?.filename?.endsWith('.csv')) {
           mimeType = 'text/csv';
         } else {
