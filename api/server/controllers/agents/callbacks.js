@@ -145,6 +145,193 @@ function checkIfLastAgent(last_agent_id, langgraph_node) {
 }
 
 /**
+ * StreamingToolEndHandler - Extends ToolEndHandler to provide streaming progress updates
+ */
+class StreamingToolEndHandler {
+  /**
+   * @param {ServerResponse} res - The response object for sending events
+   * @param {ToolEndCallback} toolEndCallback - Callback to use when tool ends
+   * @param {(name?: string) => boolean} omitOutput - Function to determine if output should be omitted
+   */
+  constructor(res, toolEndCallback, omitOutput) {
+    this.res = res;
+    this.toolEndCallback = toolEndCallback;
+    this.omitOutput = omitOutput;
+    this.toolProgressMap = new Map();
+
+    // Create the actual ToolEndHandler instance
+    this.toolEndHandler = new ToolEndHandler(toolEndCallback, omitOutput);
+  }
+
+  /**
+   * Handle tool end event with streaming support
+   * @param {string} event - The event name
+   * @param {StreamEventData | undefined} data - The event data
+   * @param {Record<string, unknown>} metadata - The metadata
+   * @param {StandardGraph} graph - The graph instance
+   */
+  handle(event, data, metadata, graph) {
+    if (!graph || !metadata) {
+      console.warn(`Graph or metadata not found in ${event} event`);
+      return;
+    }
+
+    const toolEndData = data;
+    if (!toolEndData?.output) {
+      console.warn('No output found in tool_end event');
+      return;
+    }
+
+    const toolName = toolEndData.output.name;
+    const toolId = this.generateToolId(toolName, metadata);
+
+    try {
+      // Send initial progress event if this is a new tool
+      if (!this.toolProgressMap.has(toolId)) {
+        this.sendProgressEvent(toolId, toolName, 0.1, false);
+        this.toolProgressMap.set(toolId, {
+          startTime: Date.now(),
+          progressTimer: this.startProgressSimulation(toolId, toolName),
+        });
+      }
+
+      // Call the original ToolEndHandler
+      this.toolEndHandler.handle(event, data, metadata, graph);
+
+      // Send completion event with the actual tool output
+      const toolData = this.toolProgressMap.get(toolId);
+      if (toolData) {
+        clearInterval(toolData.progressTimer);
+        this.toolProgressMap.delete(toolId);
+      }
+
+      this.sendProgressEvent(toolId, toolName, 1.0, true, toolEndData.output);
+    } catch (error) {
+      // Clean up progress tracking on error
+      const toolData = this.toolProgressMap.get(toolId);
+      if (toolData) {
+        clearInterval(toolData.progressTimer);
+        this.toolProgressMap.delete(toolId);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Generate a unique tool ID for progress tracking
+   * @param {string} toolName - The tool name
+   * @param {Record<string, unknown>} metadata - The metadata
+   * @returns {string} - Unique tool ID
+   */
+  generateToolId(toolName, metadata) {
+    const runId = metadata.run_id || 'unknown';
+    const agentId = metadata.agent_id || 'unknown';
+    const timestamp = Date.now();
+    return `${runId}-${agentId}-${toolName}-${timestamp}`;
+  }
+
+  /**
+   * Start simulated progress updates for a tool
+   * @param {string} toolId - The tool ID
+   * @param {string} toolName - The tool name
+   * @returns {NodeJS.Timeout} - The interval timer
+   */
+  startProgressSimulation(toolId, toolName) {
+    let currentProgress = 0.1;
+    const progressSteps = [0.3, 0.5, 0.7, 0.9];
+    let stepIndex = 0;
+
+    return setInterval(() => {
+      if (stepIndex < progressSteps.length && this.toolProgressMap.has(toolId)) {
+        currentProgress = progressSteps[stepIndex];
+        this.sendProgressEvent(toolId, toolName, currentProgress, false);
+        stepIndex++;
+      } else {
+        // Clear interval if we've sent all progress steps
+        const toolData = this.toolProgressMap.get(toolId);
+        if (toolData) {
+          clearInterval(toolData.progressTimer);
+        }
+      }
+    }, 800); // Send progress update every 800ms
+  }
+
+  /**
+   * Send progress event to the frontend
+   * @param {string} toolId - The tool ID
+   * @param {string} toolName - The tool name
+   * @param {number} progress - Progress value (0-1)
+   * @param {boolean} isFinal - Whether this is the final update
+   * @param {any} output - The tool output (for final update)
+   */
+  sendProgressEvent(toolId, toolName, progress, isFinal, output) {
+    try {
+      /** @type {ToolCallResultDeltaEvent} */
+      const eventData = {
+        toolId,
+        toolName,
+        progress,
+        total: 1.0,
+        isFinal,
+        chunk: output ? JSON.stringify(output) : '',
+        streamMode: 'append',
+        mimeType: this.detectMimeType(output),
+      };
+
+      sendEvent(this.res, {
+        event: 'on_tool_result_delta',
+        data: eventData,
+      });
+    } catch (error) {
+      logger.error(`Error sending progress event for tool ${toolName}:`, error);
+    }
+  }
+
+  /**
+   * Detect MIME type from tool output
+   * @param {any} output - The tool output
+   * @returns {string} - The detected MIME type
+   */
+  detectMimeType(output) {
+    if (!output) {
+      return 'text/plain';
+    }
+
+    const outputStr = typeof output === 'string' ? output : JSON.stringify(output);
+
+    try {
+      const parsed = JSON.parse(outputStr);
+
+      // Check for CSV data indicators
+      if (
+        parsed.csv_data ||
+        parsed.file?.filename?.endsWith('.csv') ||
+        parsed.mimeType === 'text/csv'
+      ) {
+        return 'text/csv';
+      }
+
+      // Default to JSON for structured data
+      return 'application/json';
+    } catch {
+      // Check for raw CSV format
+      if (typeof output === 'string' && output.includes(',') && output.includes('\n')) {
+        const lines = output.split('\n').filter((line) => line.trim());
+        if (lines.length > 1) {
+          const firstLineCommas = (lines[0].match(/,/g) || []).length;
+          const secondLineCommas = (lines[1].match(/,/g) || []).length;
+          if (firstLineCommas > 0 && Math.abs(firstLineCommas - secondLineCommas) <= 1) {
+            return 'text/csv';
+          }
+        }
+      }
+
+      return 'text/plain';
+    }
+  }
+}
+
+/**
  * Get default handlers for stream events.
  * @param {Object} options - The options object.
  * @param {ServerResponse} options.res - The options object.
@@ -162,7 +349,7 @@ function getDefaultHandlers({ res, aggregateContent, toolEndCallback, collectedU
   }
   const handlers = {
     [GraphEvents.CHAT_MODEL_END]: new ModelEndHandler(collectedUsage),
-    [GraphEvents.TOOL_END]: new ToolEndHandler(toolEndCallback),
+    [GraphEvents.TOOL_END]: new StreamingToolEndHandler(res, toolEndCallback),
     [GraphEvents.CHAT_MODEL_STREAM]: new ChatModelStreamHandler(),
     [GraphEvents.ON_RUN_STEP]: {
       /**
