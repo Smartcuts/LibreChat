@@ -7,6 +7,7 @@ import { useRecoilValue } from 'recoil';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkDirective from 'remark-directive';
+import rehypeRaw from 'rehype-raw';
 import type { Pluggable } from 'unified';
 import { Citation, CompositeCitation, HighlightedText } from '~/components/Web/Citation';
 import { Artifact, artifactPlugin } from '~/components/Artifacts/Artifact';
@@ -44,6 +45,7 @@ const Markdown = memo(({ content = '', isLatestMessage }: TContentProps) => {
           subset: langSubset,
         },
       ],
+      rehypeRaw,
     ],
     [],
   );
