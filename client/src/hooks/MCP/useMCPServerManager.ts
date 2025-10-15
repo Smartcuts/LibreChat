@@ -29,6 +29,10 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
 
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [selectedToolForConfig, setSelectedToolForConfig] = useState<TPlugin | null>(null);
+  const [isOAuthPromptOpen, setIsOAuthPromptOpen] = useState(false);
+  const [oauthPromptServers, setOAuthPromptServers] = useState<
+    Array<{ name: string; oauthUrl: string }>
+  >([]);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const mcpValuesRef = useRef(mcpValues);
 
@@ -101,14 +105,28 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
 
     if (!mcpValues?.length) return;
 
-    const connectedSelected = mcpValues.filter(
-      (serverName) => connectionStatus[serverName]?.connectionState === 'connected',
-    );
+    // Keep servers that are:
+    // 1. Connected
+    // 2. Currently initializing (OAuth in progress)
+    // 3. OAuth servers awaiting user authorization (selected but not yet initialized)
+    const validSelected = mcpValues.filter((serverName) => {
+      const serverConfig = startupConfig?.mcpServers?.[serverName] as
+        | { isOAuth?: boolean }
+        | undefined;
+      const isOAuth = serverConfig?.isOAuth === true;
+      const initializing = serverStates[serverName]?.isInitializing || false;
 
-    if (connectedSelected.length !== mcpValues.length) {
-      setMCPValues(connectedSelected);
+      return (
+        connectionStatus[serverName]?.connectionState === 'connected' ||
+        initializing ||
+        isOAuth
+      );
+    });
+
+    if (validSelected.length !== mcpValues.length) {
+      setMCPValues(validSelected);
     }
-  }, [connectionStatus, mcpValues, setMCPValues]);
+  }, [connectionStatus, mcpValues, setMCPValues, serverStates, startupConfig]);
 
   const updateServerState = useCallback((serverName: string, updates: Partial<ServerState>) => {
     setServerStates((prev) => {
@@ -310,7 +328,20 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
           });
 
           if (autoOpenOAuth) {
-            window.open(response.oauthUrl, '_blank', 'noopener,noreferrer');
+            const popup = window.open(response.oauthUrl, '_blank', 'noopener,noreferrer');
+
+            // Detect if popup was blocked
+            if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+              // Add this server to the OAuth prompt list
+              setOAuthPromptServers((prev) => {
+                // Avoid duplicates
+                if (prev.some((s) => s.name === serverName)) {
+                  return prev;
+                }
+                return [...prev, { name: serverName, oauthUrl: response.oauthUrl }];
+              });
+              setIsOAuthPromptOpen(true);
+            }
           }
 
           startServerPolling(serverName);
@@ -402,31 +433,67 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
     [startupConfig?.interface?.mcpServers?.placeholder, localize],
   );
 
+  // Check if any server is currently initializing (OAuth pending)
+  const hasAnyInitializing = useMemo(() => {
+    return Object.values(serverStates).some((state) => state.isInitializing);
+  }, [serverStates]);
+
   const batchToggleServers = useCallback(
     (serverNames: string[]) => {
       const connectedServers: string[] = [];
       const disconnectedServers: string[] = [];
+      const connectingServers: string[] = [];
+      const initializingServers: string[] = [];
 
       serverNames.forEach((serverName) => {
         if (isInitializing(serverName)) {
+          initializingServers.push(serverName);
           return;
         }
 
         const serverStatus = connectionStatus?.[serverName];
+        const serverConfig = startupConfig?.mcpServers?.[serverName] as
+          | { isOAuth?: boolean }
+          | undefined;
+        const isOAuth = serverConfig?.isOAuth === true;
+
         if (serverStatus?.connectionState === 'connected') {
           connectedServers.push(serverName);
+        } else if (serverStatus?.connectionState === 'connecting' || serverStates === undefined) {
+          // OAuth servers in 'connecting' state need initialization if we don't have OAuth flow tracked
+          // This handles the race condition where connectionStatus loads before OAuth flow is started
+          const hasOAuthFlowTracked = serverStates[serverName]?.oauthUrl != null;
+          if (isOAuth && !hasOAuthFlowTracked) {
+            disconnectedServers.push(serverName);
+          } else {
+            connectingServers.push(serverName);
+          }
         } else {
           disconnectedServers.push(serverName);
         }
       });
 
-      setMCPValues(connectedServers);
+      // Mark disconnected servers as initializing BEFORE updating mcpValues
+      // This prevents the filter effect from removing them
+      disconnectedServers.forEach((serverName) => {
+        updateServerState(serverName, { isInitializing: true });
+      });
 
+      // Keep all servers: connected, connecting, initializing, and about-to-initialize
+      // This allows OAuth servers with defaultSelected:true to remain selected during authentication
+      setMCPValues([
+        ...connectedServers,
+        ...connectingServers,
+        ...initializingServers,
+        ...disconnectedServers,
+      ]);
+
+      // Now actually start the async initialization
       disconnectedServers.forEach((serverName) => {
         initializeServer(serverName);
       });
     },
-    [connectionStatus, setMCPValues, initializeServer, isInitializing],
+    [connectionStatus, setMCPValues, initializeServer, isInitializing, updateServerState, serverStates, startupConfig],
   );
 
   const toggleServerSelection = useCallback(
@@ -510,6 +577,30 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
         }
         previousFocusRef.current = null;
       }, 0);
+    }
+  }, []);
+
+  const handleOAuthPromptAuthorize = useCallback(
+    (serverName: string) => {
+      const server = oauthPromptServers.find((s) => s.name === serverName);
+      if (server) {
+        window.open(server.oauthUrl, '_blank', 'noopener,noreferrer');
+        // Remove this server from the prompt list
+        setOAuthPromptServers((prev) => prev.filter((s) => s.name !== serverName));
+        // Close modal if no more servers need authorization
+        if (oauthPromptServers.length === 1) {
+          setIsOAuthPromptOpen(false);
+        }
+      }
+    },
+    [oauthPromptServers],
+  );
+
+  const handleOAuthPromptOpenChange = useCallback((open: boolean) => {
+    setIsOAuthPromptOpen(open);
+    // Clear the list when modal is closed
+    if (!open) {
+      setOAuthPromptServers([]);
     }
   }, []);
 
@@ -641,6 +732,8 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
     batchToggleServers,
     toggleServerSelection,
     localize,
+    hasAnyInitializing,
+    startupConfig,
 
     isConfigModalOpen,
     handleDialogOpenChange,
@@ -650,5 +743,11 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
     handleRevoke,
     getServerStatusIconProps,
     getConfigDialogProps,
+
+    // OAuth prompt modal
+    isOAuthPromptOpen,
+    oauthPromptServers,
+    handleOAuthPromptAuthorize,
+    handleOAuthPromptOpenChange,
   };
 }

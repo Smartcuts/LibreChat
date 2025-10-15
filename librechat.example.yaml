@@ -169,6 +169,7 @@ actions:
 #     # type: sse # type can optionally be omitted
 #     url: http://localhost:3001/sse
 #     timeout: 60000  # 1 minute timeout for this server, this is the default timeout for MCP servers.
+#     defaultSelected: true  # Automatically select this server for new conversations
 #   puppeteer:
 #     type: stdio
 #     command: npx

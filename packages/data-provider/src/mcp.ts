@@ -10,6 +10,12 @@ const BaseOptionsSchema = z.object({
    *   requiring manual authentication (e.g., GitHub PAT tokens) that need to be configured through the UI after startup
    */
   startup: z.boolean().optional(),
+  /**
+   * Controls whether this MCP server is selected by default for new conversations.
+   * - true: Server will be automatically selected for new conversations
+   * - false/undefined (default): Server must be manually selected
+   */
+  defaultSelected: z.boolean().optional(),
   iconPath: z.string().optional(),
   timeout: z.number().optional(),
   initTimeout: z.number().optional(),

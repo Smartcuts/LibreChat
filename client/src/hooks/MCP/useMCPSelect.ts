@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAtom } from 'jotai';
 import isEqual from 'lodash/isEqual';
 import { useRecoilState } from 'recoil';
@@ -13,6 +13,7 @@ export function useMCPSelect({ conversationId }: { conversationId?: string | nul
   const configuredServers = useMemo(() => {
     return new Set(Object.keys(startupConfig?.mcpServers ?? {}));
   }, [startupConfig?.mcpServers]);
+  const hasAppliedDefaults = useRef<Set<string>>(new Set());
 
   const [isPinned, setIsPinned] = useAtom(mcpPinnedAtom);
   const [mcpValues, setMCPValuesRaw] = useAtom(mcpValuesAtomFamily(key));
@@ -38,6 +39,34 @@ export function useMCPSelect({ conversationId }: { conversationId?: string | nul
       return prev;
     });
   }, [mcpValues, setEphemeralAgent]);
+
+  // Apply default selections for new conversations
+  useEffect(() => {
+    // Skip if we've already applied defaults for this conversation
+    if (hasAppliedDefaults.current.has(key)) {
+      return;
+    }
+
+    // Skip if there are already selected values (user has made a selection)
+    if (mcpValues.length > 0) {
+      return;
+    }
+
+    // Skip if no startup config available yet
+    if (!startupConfig?.mcpServers) {
+      return;
+    }
+
+    // Find servers with defaultSelected: true
+    const defaultServers = Object.entries(startupConfig.mcpServers)
+      .filter(([, config]) => config.defaultSelected === true && config.chatMenu !== false)
+      .map(([serverName]) => serverName);
+
+    if (defaultServers.length > 0) {
+      hasAppliedDefaults.current.add(key);
+      setMCPValuesRaw(defaultServers);
+    }
+  }, [key, mcpValues.length, startupConfig, setMCPValuesRaw]);
 
   useEffect(() => {
     const mcpStorageKey = `${LocalStorageKeys.LAST_MCP_}${key}`;

@@ -1,7 +1,8 @@
-import React, { memo, useCallback } from 'react';
-import { MultiSelect, MCPIcon } from '@librechat/client';
+import React, { memo, useCallback, useEffect, useRef } from 'react';
+import { MultiSelect, MCPIcon, Spinner } from '@librechat/client';
 import MCPServerStatusIcon from '~/components/MCP/MCPServerStatusIcon';
 import MCPConfigDialog from '~/components/MCP/MCPConfigDialog';
+import MCPOAuthPromptDialog from '~/components/MCP/MCPOAuthPromptDialog';
 import { useBadgeRowContext } from '~/Providers';
 
 function MCPSelectContent() {
@@ -16,7 +17,28 @@ function MCPSelectContent() {
     batchToggleServers,
     getConfigDialogProps,
     getServerStatusIconProps,
+    hasAnyInitializing,
+    isOAuthPromptOpen,
+    oauthPromptServers,
+    handleOAuthPromptAuthorize,
+    handleOAuthPromptOpenChange,
   } = mcpServerManager;
+
+  const hasInitializedRef = useRef(false);
+
+  // Auto-initialize default servers on component mount if they're selected
+  useEffect(() => {
+    // Only run once and only if we haven't initialized yet
+    if (hasInitializedRef.current || !mcpValues || mcpValues.length === 0) {
+      return;
+    }
+
+    hasInitializedRef.current = true;
+    // Trigger batchToggleServers which will initialize any non-connected servers
+    // Note: OAuth popups may be blocked by browser popup blockers when not triggered by direct user action
+    // In that case, the UI will show the server as needing authorization and user can click to authorize
+    batchToggleServers(mcpValues);
+  }, [mcpValues, batchToggleServers]);
 
   const renderSelectedValues = useCallback(
     (values: string[], placeholder?: string) => {
@@ -86,13 +108,29 @@ function MCPSelectContent() {
         placeholder={placeholderText}
         popoverClassName="min-w-fit"
         className="badge-icon min-w-fit"
-        selectIcon={<MCPIcon className="icon-md text-text-primary" />}
+        selectIcon={
+          hasAnyInitializing ? (
+            <Spinner className="icon-md" />
+          ) : (
+            <MCPIcon className="icon-md text-text-primary" />
+          )
+        }
         selectItemsClassName="border border-blue-600/50 bg-blue-500/10 hover:bg-blue-700/10"
-        selectClassName="group relative inline-flex items-center justify-center md:justify-start gap-1.5 rounded-full border border-border-medium text-sm font-medium transition-all md:w-full size-9 p-2 md:p-3 bg-transparent shadow-sm hover:bg-surface-hover hover:shadow-md active:shadow-inner"
+        selectClassName={`group relative inline-flex items-center justify-center md:justify-start gap-1.5 rounded-full border text-sm font-medium transition-all md:w-full size-9 p-2 md:p-3 shadow-sm hover:shadow-md active:shadow-inner ${
+          hasAnyInitializing
+            ? 'border-blue-500 bg-blue-500/10 animate-pulse'
+            : 'border-border-medium bg-transparent hover:bg-surface-hover'
+        }`}
       />
       {configDialogProps && (
         <MCPConfigDialog {...configDialogProps} conversationId={conversationId} />
       )}
+      <MCPOAuthPromptDialog
+        isOpen={isOAuthPromptOpen}
+        onOpenChange={handleOAuthPromptOpenChange}
+        servers={oauthPromptServers}
+        onAuthorize={handleOAuthPromptAuthorize}
+      />
     </>
   );
 }

@@ -675,6 +675,7 @@ export type TStartupConfig = {
       chatMenu?: boolean;
       isOAuth?: boolean;
       startup?: boolean;
+      defaultSelected?: boolean;
     }
   >;
   mcpPlaceholder?: string;
