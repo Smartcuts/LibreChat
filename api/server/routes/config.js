@@ -148,6 +148,7 @@ router.get('/', async function (req, res) {
             isOAuth: serverConfig.requiresOAuth,
             customUserVars: serverConfig?.customUserVars,
             defaultSelected: serverConfig?.defaultSelected,
+            oauthDescriptiveText: serverConfig?.oauth?.descriptive_text,
           });
         }
       } catch (error) {

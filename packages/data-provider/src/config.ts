@@ -676,6 +676,7 @@ export type TStartupConfig = {
       isOAuth?: boolean;
       startup?: boolean;
       defaultSelected?: boolean;
+      oauthDescriptiveText?: string;
     }
   >;
   mcpPlaceholder?: string;

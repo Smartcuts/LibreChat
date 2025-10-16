@@ -31,7 +31,7 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
   const [selectedToolForConfig, setSelectedToolForConfig] = useState<TPlugin | null>(null);
   const [isOAuthPromptOpen, setIsOAuthPromptOpen] = useState(false);
   const [oauthPromptServers, setOAuthPromptServers] = useState<
-    Array<{ name: string; oauthUrl: string }>
+    Array<{ name: string; oauthUrl: string; descriptiveText?: string }>
   >([]);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const mcpValuesRef = useRef(mcpValues);
@@ -338,7 +338,15 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
                 if (prev.some((s) => s.name === serverName)) {
                   return prev;
                 }
-                return [...prev, { name: serverName, oauthUrl: response.oauthUrl }];
+                const serverConfig = startupConfig?.mcpServers?.[serverName];
+                return [
+                  ...prev,
+                  {
+                    name: serverName,
+                    oauthUrl: response.oauthUrl,
+                    descriptiveText: serverConfig?.oauthDescriptiveText,
+                  },
+                ];
               });
               setIsOAuthPromptOpen(true);
             }

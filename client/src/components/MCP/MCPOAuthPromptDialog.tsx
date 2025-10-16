@@ -12,7 +12,7 @@ import { useLocalize } from '~/hooks';
 interface MCPOAuthPromptDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  servers: Array<{ name: string; oauthUrl: string }>;
+  servers: Array<{ name: string; oauthUrl: string; descriptiveText?: string }>;
   onAuthorize: (serverName: string) => void;
 }
 
@@ -61,7 +61,9 @@ export default function MCPOAuthPromptDialog({
                   </div>
                   <div>
                     <p className="font-medium text-text-primary">{server.name}</p>
-                    <p className="text-xs text-text-secondary">OAuth required</p>
+                    <p className="text-xs text-text-secondary">
+                      {server.descriptiveText || 'OAuth required'}
+                    </p>
                   </div>
                 </div>
                 <Button
