@@ -327,30 +327,23 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
             isInitializing: true,
           });
 
-          if (autoOpenOAuth) {
-            const popup = window.open(response.oauthUrl, '_blank', 'noopener,noreferrer');
-
-            // Detect if popup was blocked
-            if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-              // Add this server to the OAuth prompt list
-              setOAuthPromptServers((prev) => {
-                // Avoid duplicates
-                if (prev.some((s) => s.name === serverName)) {
-                  return prev;
-                }
-                const serverConfig = startupConfig?.mcpServers?.[serverName];
-                return [
-                  ...prev,
-                  {
-                    name: serverName,
-                    oauthUrl: response.oauthUrl,
-                    descriptiveText: serverConfig?.oauthDescriptiveText,
-                  },
-                ];
-              });
-              setIsOAuthPromptOpen(true);
+          // Always use modal for better UX - no automatic popups
+          setOAuthPromptServers((prev) => {
+            // Avoid duplicates
+            if (prev.some((s) => s.name === serverName)) {
+              return prev;
             }
-          }
+            const serverConfig = startupConfig?.mcpServers?.[serverName];
+            return [
+              ...prev,
+              {
+                name: serverName,
+                oauthUrl: response.oauthUrl,
+                descriptiveText: serverConfig?.oauthDescriptiveText,
+              },
+            ];
+          });
+          setIsOAuthPromptOpen(true);
 
           startServerPolling(serverName);
         } else {
@@ -607,7 +600,7 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
     (serverName: string) => {
       const server = oauthPromptServers.find((s) => s.name === serverName);
       if (server) {
-        window.open(server.oauthUrl, '_blank', 'noopener,noreferrer');
+        window.open(server.oauthUrl, '_blank', 'noreferrer');
         // Remove this server from the prompt list
         setOAuthPromptServers((prev) => prev.filter((s) => s.name !== serverName));
         // Close modal if no more servers need authorization
