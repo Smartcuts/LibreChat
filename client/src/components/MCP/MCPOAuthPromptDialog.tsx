@@ -14,6 +14,10 @@ interface MCPOAuthPromptDialogProps {
   onOpenChange: (isOpen: boolean) => void;
   servers: Array<{ name: string; oauthUrl: string; descriptiveText?: string }>;
   onAuthorize: (serverName: string) => void;
+  mcpPlaceholder?: string;
+  authPromptTitle?: string;
+  authPromptText?: string;
+  authPromptAction?: string;
 }
 
 export default function MCPOAuthPromptDialog({
@@ -21,6 +25,10 @@ export default function MCPOAuthPromptDialog({
   onOpenChange,
   servers,
   onAuthorize,
+  mcpPlaceholder,
+  authPromptTitle,
+  authPromptText,
+  authPromptAction,
 }: MCPOAuthPromptDialogProps) {
   const localize = useLocalize();
 
@@ -30,26 +38,22 @@ export default function MCPOAuthPromptDialog({
 
   return (
     <OGDialog open={isOpen} onOpenChange={onOpenChange}>
-      <OGDialogContent className="flex max-h-screen w-11/12 max-w-lg flex-col space-y-4">
+      <OGDialogContent className="flex max-h-screen w-11/12 max-w-lg flex-col">
         <OGDialogHeader>
           <div className="flex items-center gap-3">
             <KeyRound className="h-6 w-6 text-amber-600 dark:text-amber-400" />
             <OGDialogTitle className="text-xl">
-              {servers.length === 1
-                ? 'Authorize MCP Server'
-                : 'Authorize MCP Servers'}
+              {authPromptTitle || `Authorize ${mcpPlaceholder || 'MCP Servers'}`}
             </OGDialogTitle>
           </div>
         </OGDialogHeader>
 
         <div className="space-y-4">
-          <p className="text-sm text-text-secondary">
-            {servers.length === 1
-              ? 'Click the button below to authorize this MCP server with OAuth.'
-              : 'The following MCP servers require authorization. Click to authorize each one.'}
-          </p>
+          {authPromptText && (
+            <p className="relative -top-1 text-sm text-text-secondary">{authPromptText}</p>
+          )}
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {servers.map((server) => (
               <div
                 key={server.name}
@@ -74,24 +78,26 @@ export default function MCPOAuthPromptDialog({
                       onOpenChange(false);
                     }
                   }}
-                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  className="bg-amber-600 text-white hover:bg-amber-700"
                 >
-                  Authorize
+                  {authPromptAction || 'Authorize'}
                 </Button>
               </div>
             ))}
           </div>
 
-          {servers.length > 1 && (
-            <div className="flex justify-end gap-2 border-t border-border-medium pt-4">
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                Later
-              </Button>
-            </div>
-          )}
+          {
+            // "Later" button only shown for multiple servers because:
+            //   - Single server: "Authorize" button auto-closes modal (lines 73-75)
+            //   - Multiple servers: User needs explicit dismiss option without authorizing all
+            servers.length > 1 && (
+              <div className="flex justify-end gap-2 border-t border-border-medium pt-4">
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Later
+                </Button>
+              </div>
+            )
+          }
         </div>
       </OGDialogContent>
     </OGDialog>

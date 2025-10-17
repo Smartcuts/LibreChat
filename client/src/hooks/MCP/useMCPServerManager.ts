@@ -441,6 +441,21 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
     [startupConfig?.interface?.mcpServers?.placeholder, localize],
   );
 
+  const authPromptTitle = useMemo(
+    () => startupConfig?.interface?.mcpServers?.auth_prompt_title,
+    [startupConfig?.interface?.mcpServers?.auth_prompt_title],
+  );
+
+  const authPromptText = useMemo(
+    () => startupConfig?.interface?.mcpServers?.auth_prompt_text,
+    [startupConfig?.interface?.mcpServers?.auth_prompt_text],
+  );
+
+  const authPromptAction = useMemo(
+    () => startupConfig?.interface?.mcpServers?.auth_prompt_action,
+    [startupConfig?.interface?.mcpServers?.auth_prompt_action],
+  );
+
   // Check if any server is currently initializing (OAuth pending)
   const hasAnyInitializing = useMemo(() => {
     return Object.values(serverStates).some((state) => state.isInitializing);
@@ -757,5 +772,8 @@ export function useMCPServerManager({ conversationId }: { conversationId?: strin
     oauthPromptServers,
     handleOAuthPromptAuthorize,
     handleOAuthPromptOpenChange,
+    authPromptTitle,
+    authPromptText,
+    authPromptAction,
   };
 }

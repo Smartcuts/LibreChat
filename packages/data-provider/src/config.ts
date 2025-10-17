@@ -517,6 +517,9 @@ export type TTermsOfService = z.infer<typeof termsOfServiceSchema>;
 
 const mcpServersSchema = z.object({
   placeholder: z.string().optional(),
+  auth_prompt_title: z.string().optional(),
+  auth_prompt_text: z.string().optional(),
+  auth_prompt_action: z.string().optional(),
 });
 
 export type TMcpServersConfig = z.infer<typeof mcpServersSchema>;

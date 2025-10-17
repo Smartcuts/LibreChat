@@ -22,6 +22,9 @@ function MCPSelectContent() {
     oauthPromptServers,
     handleOAuthPromptAuthorize,
     handleOAuthPromptOpenChange,
+    authPromptTitle,
+    authPromptText,
+    authPromptAction,
   } = mcpServerManager;
 
   const hasInitializedRef = useRef(false);
@@ -130,6 +133,10 @@ function MCPSelectContent() {
         onOpenChange={handleOAuthPromptOpenChange}
         servers={oauthPromptServers}
         onAuthorize={handleOAuthPromptAuthorize}
+        mcpPlaceholder={placeholderText}
+        authPromptTitle={authPromptTitle}
+        authPromptText={authPromptText}
+        authPromptAction={authPromptAction}
       />
     </>
   );

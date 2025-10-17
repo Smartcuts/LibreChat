@@ -96,6 +96,12 @@ interface:
   marketplace:
       use: false
   fileCitations: true
+  # MCP Servers UI customization
+  # mcpServers:
+  #   placeholder: "Tools"                               # Custom name for MCP servers in UI (default: "MCP Servers")
+  #   auth_prompt_title: "Authorize Tools"               # Custom OAuth dialog title (default: "Authorize {placeholder}")
+  #   auth_prompt_text: "Connect tools and data sources" # Custom OAuth dialog body text (optional)
+  #   auth_prompt_action: "Connect"                      # Custom OAuth button text (default: "Authorize")
   # Temporary chat retention period in hours (default: 720, min: 1, max: 8760)
   # temporaryChatRetention: 1
 
