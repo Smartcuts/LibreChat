@@ -235,31 +235,36 @@ export default function StreamingToolCall({
   return (
     <div className="my-3 rounded-lg border border-border-light bg-surface-primary">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border-light px-4 py-3">
-        <div className="flex items-center gap-3">
-          {getIcon()}
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold">Tool Output</span>
-              <span className="rounded-full bg-surface-tertiary px-2 py-0.5 text-xs font-medium text-text-secondary">
+      <div className="flex flex-row items-start justify-between gap-2 border-b border-border-light px-3 py-2.5 md:items-center md:gap-3 md:px-4 md:py-3">
+        <div className="grow-1 shrink-1 flex min-w-0 items-start gap-2 md:w-auto md:gap-3">
+          <div className="mt-0.5 shrink-0">{getIcon()}</div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5 md:gap-2">
+              <span className="shrink-0 text-xs font-semibold md:text-sm">Tool Output</span>
+              <span className="truncate rounded-full bg-surface-tertiary px-2 py-0.5 text-xs font-medium text-text-secondary">
                 {name}
               </span>
             </div>
-            <span className={`text-xs ${error ? 'text-red-500' : 'text-text-tertiary'}`}>
+            <div className={`truncate text-xs ${error ? 'text-red-500' : 'text-text-tertiary'}`}>
               {getStatusText()}
-            </span>
+            </div>
           </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => setShowInfo(!showInfo)} className="gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowInfo(!showInfo)}
+          className="ml-auto gap-1 self-start md:ml-0 md:self-auto"
+        >
           {showInfo ? (
             <>
               <ChevronUp className="h-4 w-4" />
-              Hide
+              <span className="hidden md:inline">Hide</span>
             </>
           ) : (
             <>
               <ChevronDown className="h-4 w-4" />
-              Show
+              <span className="hidden md:inline">Show</span>
             </>
           )}
         </Button>
@@ -267,7 +272,7 @@ export default function StreamingToolCall({
 
       {/* Content */}
       {showInfo && (
-        <div className="p-4">
+        <div className="p-3 md:p-4">
           {/* Render the appropriate streaming component */}
           {renderStreamingContent()}
 
