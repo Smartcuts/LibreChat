@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react';
 import { Button } from '@librechat/client';
-import { Database, ChevronDown, ChevronUp, FileText, Code, AlignLeft } from 'lucide-react';
+import { Database, ChevronDown, ChevronUp, FileText, Code, AlignLeft, Globe } from 'lucide-react';
 import type { TAttachment, Agents } from 'librechat-data-provider';
 import { useLocalize, useProgress } from '~/hooks';
+import { detectContentType } from '~/utils/contentTypeDetection';
 import { AttachmentGroup } from './Parts';
 import ToolCallInfo from './ToolCallInfo';
 import ProgressText from './ProgressText';
 import StreamingCSV from './StreamingCSV';
 import StreamingJSON from './StreamingJSON';
 import StreamingText from './StreamingText';
+import StreamingMarkdown from './StreamingMarkdown';
+import StreamingHTML from './StreamingHTML';
 
 export default function StreamingToolCall({
   initialProgress = 0.1,
@@ -74,35 +77,31 @@ export default function StreamingToolCall({
         contentToCheck = output;
       }
 
+      // Try JSON parsing first (explicit structured data)
       try {
         const parsed = JSON.parse(contentToCheck);
-        // Check if it looks like CSV data
+
+        // Check for CSV metadata
         if (
           parsed.csv_data ||
           parsed.file?.filename?.endsWith('.csv') ||
           parsed.mimeType === 'text/csv'
         ) {
           mimeType = 'text/csv';
-        } else {
+        }
+        // Check for embedded mimeType
+        else if (parsed.mimeType) {
+          mimeType = parsed.mimeType;
+        }
+        // Valid JSON
+        else {
           mimeType = 'application/json';
         }
       } catch {
-        // Check if it's raw CSV data (starts with headers and has comma-separated values)
+        // Not JSON - use heuristic content detection
         if (contentToCheck && typeof contentToCheck === 'string') {
-          const lines = contentToCheck.split('\n');
-          if (lines.length > 1 && lines[0].includes(',')) {
-            // Looks like CSV - check if all lines have similar comma counts
-            const firstLineCommas = (lines[0].match(/,/g) || []).length;
-            const secondLineCommas = (lines[1].match(/,/g) || []).length;
-
-            if (firstLineCommas > 0 && Math.abs(firstLineCommas - secondLineCommas) <= 1) {
-              mimeType = 'text/csv';
-            } else {
-              mimeType = 'text/plain';
-            }
-          } else {
-            mimeType = 'text/plain';
-          }
+          const detectedType = detectContentType(contentToCheck);
+          mimeType = detectedType || 'text/plain';
         } else {
           mimeType = 'text/plain';
         }
@@ -119,9 +118,17 @@ export default function StreamingToolCall({
       case 'text/json':
         return <StreamingJSON streamingData={propStreamingData} output={output} />;
 
-      case 'text/plain':
-      case 'text/html':
       case 'text/markdown':
+      case 'text/md':
+        return (
+          <StreamingMarkdown streamingData={propStreamingData} output={output} toolName={name} />
+        );
+
+      case 'text/html':
+      case 'application/vnd.code-html':
+        return <StreamingHTML streamingData={propStreamingData} output={output} toolName={name} />;
+
+      case 'text/plain':
         return <StreamingText streamingData={propStreamingData} output={output} />;
 
       default:
@@ -155,15 +162,24 @@ export default function StreamingToolCall({
         contentToCheck = output;
       }
 
+      // Try JSON parsing first
       try {
         const parsed = JSON.parse(contentToCheck);
-        if (parsed.csv_data || parsed.file?.filename?.endsWith('.csv')) {
+        if (parsed.csv_data || parsed.file?.filename?.endsWith('.csv') || parsed.mimeType === 'text/csv') {
           mimeType = 'text/csv';
+        } else if (parsed.mimeType) {
+          mimeType = parsed.mimeType;
         } else {
           mimeType = 'application/json';
         }
       } catch {
-        mimeType = 'text/plain';
+        // Not JSON - use heuristic content detection
+        if (contentToCheck && typeof contentToCheck === 'string') {
+          const detectedType = detectContentType(contentToCheck);
+          mimeType = detectedType || 'text/plain';
+        } else {
+          mimeType = 'text/plain';
+        }
       }
     }
 
@@ -172,6 +188,12 @@ export default function StreamingToolCall({
     }
     if (mimeType?.includes('json')) {
       return <Code className="h-4 w-4 text-green-500" />;
+    }
+    if (mimeType?.includes('html')) {
+      return <Globe className="h-4 w-4 text-orange-500" />;
+    }
+    if (mimeType?.includes('markdown') || mimeType?.includes('md')) {
+      return <FileText className="h-4 w-4 text-purple-500" />;
     }
     if (mimeType?.includes('text')) {
       return <AlignLeft className="h-4 w-4 text-gray-500" />;
