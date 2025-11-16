@@ -57,6 +57,10 @@ export enum QueryKeys {
   resourcePermissions = 'resourcePermissions',
   effectivePermissions = 'effectivePermissions',
   graphToken = 'graphToken',
+  /* Admin */
+  adminConversations = 'adminConversations',
+  adminConversation = 'adminConversation',
+  adminUserSearch = 'adminUserSearch',
 }
 
 // Dynamic query keys that require parameters

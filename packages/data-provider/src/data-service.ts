@@ -663,6 +663,31 @@ export function archiveConversation(
   return request.post(endpoints.updateConversation(), { arg: payload });
 }
 
+/* Admin Functions */
+export const adminListConversations = (
+  params?: q.ConversationListParams,
+): Promise<q.ConversationListResponse> => {
+  return request.get(endpoints.adminConversations(params ?? {}));
+};
+
+export function adminGetConversation(conversationId: string): Promise<{
+  conversation: s.TConversation;
+  messages: s.TMessage[];
+}> {
+  return request.get(endpoints.adminConversationById(conversationId));
+}
+
+export function adminSearchUsers(query: string, limit?: number): Promise<Array<{
+  _id: string;
+  email: string;
+  name?: string;
+  username?: string;
+  role?: string;
+  createdAt?: string;
+}>> {
+  return request.get(endpoints.adminUserSearch(query, limit));
+}
+
 export function genTitle(payload: m.TGenTitleRequest): Promise<m.TGenTitleResponse> {
   return request.post(endpoints.genTitle(), payload);
 }

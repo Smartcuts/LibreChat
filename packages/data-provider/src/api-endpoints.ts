@@ -381,3 +381,14 @@ export const getEffectivePermissions = (resourceType: ResourceType, resourceId: 
 // SharePoint Graph API Token
 export const graphToken = (scopes: string) =>
   `${BASE_URL}/api/auth/graph-token?scopes=${encodeURIComponent(scopes)}`;
+
+/* Admin Endpoints */
+export const adminConversations = (params: q.ConversationListParams) => {
+  return `${BASE_URL}/api/admin/conversations${buildQuery(params)}`;
+};
+
+export const adminConversationById = (id: string) =>
+  `${BASE_URL}/api/admin/conversations/${id}`;
+
+export const adminUserSearch = (query: string, limit?: number) =>
+  `${BASE_URL}/api/admin/users/search?q=${encodeURIComponent(query)}${limit ? `&limit=${limit}` : ''}`;

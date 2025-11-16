@@ -27,6 +27,7 @@ const edit = require('./edit');
 const keys = require('./keys');
 const user = require('./user');
 const mcp = require('./mcp');
+const admin = require('./admin');
 
 module.exports = {
   mcp,
@@ -39,6 +40,7 @@ module.exports = {
   oauth,
   files,
   share,
+  admin,
   banner,
   agents,
   convos,

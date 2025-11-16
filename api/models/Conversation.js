@@ -80,6 +80,92 @@ module.exports = {
   searchConversation,
   deleteNullOrEmptyConversations,
   /**
+   * Gets all conversations for admin console with optional filters.
+   * @param {Object} options - Query options.
+   * @param {string} [options.cursor] - Pagination cursor.
+   * @param {number} [options.limit=25] - Number of results to return.
+   * @param {string} [options.userId] - Filter by user ID.
+   * @param {string} [options.search] - Search query.
+   * @param {string} [options.order='desc'] - Sort order.
+   * @returns {Promise<{conversations: Array, nextCursor: string | null}>} Conversations with user info.
+   */
+  getConvosAdmin: async ({ cursor, limit = 25, userId, search, order = 'desc' } = {}) => {
+    const filters = [];
+
+    if (userId) {
+      filters.push({ user: userId });
+    }
+
+    // Don't include expired conversations
+    filters.push({ $or: [{ expiredAt: null }, { expiredAt: { $exists: false } }] });
+
+    if (search) {
+      try {
+        const meiliFilter = userId ? `user = "${userId}"` : undefined;
+        const meiliResults = await Conversation.meiliSearch(search, { filter: meiliFilter });
+        const matchingIds = Array.isArray(meiliResults.hits)
+          ? meiliResults.hits.map((result) => result.conversationId)
+          : [];
+        if (!matchingIds.length) {
+          return { conversations: [], nextCursor: null };
+        }
+        filters.push({ conversationId: { $in: matchingIds } });
+      } catch (error) {
+        logger.error('[getConvosAdmin] Error during meiliSearch', error);
+        return { message: 'Error during meiliSearch' };
+      }
+    }
+
+    if (cursor) {
+      filters.push({ updatedAt: { $lt: new Date(cursor) } });
+    }
+
+    const query = filters.length === 0 ? {} : filters.length === 1 ? filters[0] : { $and: filters };
+
+    try {
+      const convos = await Conversation.find(query)
+        .select(
+          'conversationId endpoint title createdAt updatedAt user model agent_id assistant_id spec iconURL tags messages',
+        )
+        .sort({ updatedAt: order === 'asc' ? 1 : -1 })
+        .limit(limit + 1)
+        .lean();
+
+      let nextCursor = null;
+      if (convos.length > limit) {
+        const lastConvo = convos.pop();
+        nextCursor = lastConvo.updatedAt.toISOString();
+      }
+
+      // Fetch user details
+      const { User } = require('~/db/models');
+      const userIds = [...new Set(convos.map((c) => c.user).filter(Boolean))];
+
+      let userMap = {};
+      if (userIds.length > 0) {
+        const users = await User.find({ _id: { $in: userIds } })
+          .select('_id email name username')
+          .lean();
+
+        users.forEach((u) => {
+          userMap[u._id.toString()] = u;
+        });
+      }
+
+      // Add message count and user details
+      const conversationsWithUserData = convos.map((convo) => ({
+        ...convo,
+        messageCount: Array.isArray(convo.messages) ? convo.messages.length : 0,
+        user: userMap[convo.user] || { _id: convo.user, email: 'Unknown' },
+      }));
+
+      return { conversations: conversationsWithUserData, nextCursor };
+    } catch (error) {
+      logger.error('[getConvosAdmin] Error getting admin conversations', error);
+      return { message: 'Error getting admin conversations' };
+    }
+  },
+  /**
    * Saves a conversation to the database.
    * @param {Object} req - The request object.
    * @param {string} conversationId - The conversation's ID.
