@@ -145,6 +145,68 @@ export function useStreamingArtifact() {
     [setArtifacts],
   );
 
+  const createArtifact = useCallback(
+    (params: {
+      type: string;
+      title: string;
+      content: string;
+      messageId: string;
+    }) => {
+      const { type, title, content, messageId } = params;
+
+      const artifactId = `${type}_${title}_${messageId}_${Date.now()}`
+        .replace(/\s+/g, '_')
+        .toLowerCase();
+
+      const artifact: Artifact = {
+        id: artifactId,
+        identifier: artifactId,
+        title,
+        type,
+        content,
+        messageId,
+        lastUpdateTime: Date.now(),
+      };
+
+      // Update artifacts state
+      setArtifacts((prev) => ({
+        ...prev,
+        [artifactId]: artifact,
+      }));
+
+      // Set as current artifact
+      setCurrentArtifactId(artifactId);
+
+      // Show artifacts panel
+      setArtifactsVisibility(true);
+
+      // Store the artifact ID for updates
+      artifactIdRef.current = artifactId;
+
+      return artifact;
+    },
+    [setArtifacts, setCurrentArtifactId, setArtifactsVisibility],
+  );
+
+  const updateArtifact = useCallback(
+    (artifactId: string, updates: Partial<Artifact>) => {
+      setArtifacts((prev) => {
+        const existing = prev?.[artifactId];
+        if (!existing) return prev;
+
+        return {
+          ...prev,
+          [artifactId]: {
+            ...existing,
+            ...updates,
+            lastUpdateTime: Date.now(),
+          },
+        };
+      });
+    },
+    [setArtifacts],
+  );
+
   // Check if artifact panel is open
   const isArtifactOpen = useCallback(() => {
     return artifactsVisible && artifactIdRef.current !== null;
@@ -156,6 +218,8 @@ export function useStreamingArtifact() {
   }, []);
 
   return {
+    createArtifact,
+    updateArtifact,
     createDataArtifact,
     updateDataArtifact,
     isArtifactOpen,
