@@ -10,6 +10,7 @@ const artifactFilename = {
   'text/html': 'index.html',
   'application/vnd.code-html': 'index.html',
   'application/vnd.data-table': 'DataTable.tsx',
+  'application/vnd.ms-excel': 'Spreadsheet.xlsx',
   // mermaid and markdown types are handled separately in useArtifactProps.ts
   default: 'index.html',
   // 'css': 'css',
@@ -35,6 +36,7 @@ const artifactTemplate: Record<
   'text/md': 'react-ts',
   'text/plain': 'react-ts',
   'application/vnd.data-table': 'react-ts',
+  'application/vnd.ms-excel': 'react-ts',
   default: 'static',
   // 'css': 'css',
   // 'javascript': 'js',
@@ -127,6 +129,7 @@ const dependenciesMap: Record<
   'text/md': markdownDependencies,
   'text/plain': markdownDependencies,
   'application/vnd.data-table': standardDependencies,
+  'application/vnd.ms-excel': standardDependencies,
   default: standardDependencies,
 };
 

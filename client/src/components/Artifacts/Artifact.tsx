@@ -77,6 +77,21 @@ export function Artifact({
         return;
       }
 
+      // Parse JSON content for complex artifact types
+      const needsDataParsing = [
+        'application/vnd.ms-excel',
+        'application/vnd.data-table',
+      ].includes(type);
+
+      let parsedData: any = undefined;
+      if (needsDataParsing && content) {
+        try {
+          parsedData = JSON.parse(content);
+        } catch (e) {
+          logger.warn('[Artifact] Failed to parse artifact data as JSON', { type, error: e });
+        }
+      }
+
       const currentArtifact: Artifact = {
         id: artifactKey,
         identifier,
@@ -86,6 +101,7 @@ export function Artifact({
         messageId,
         index: artifactIndex,
         lastUpdateTime: now,
+        data: parsedData,
       };
 
       if (!isArtifactRoute(location.pathname)) {

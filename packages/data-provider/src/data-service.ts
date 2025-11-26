@@ -990,3 +990,98 @@ export function getGraphApiToken(params: q.GraphTokenParams): Promise<q.GraphTok
 export function getDomainServerBaseUrl(): string {
   return `${endpoints.apiBaseUrl()}/api`;
 }
+
+// Spreadsheet Artifact Methods
+export interface CreateSpreadsheetRequest {
+  title: string;
+  headers: string[];
+  rows: Array<Array<string | number | boolean | null>>;
+  conversationId?: string;
+  messageId?: string;
+}
+
+export interface UpdateSpreadsheetRequest {
+  headers: string[];
+  rows: Array<Array<string | number | boolean | null>>;
+}
+
+export interface SpreadsheetArtifactResponse {
+  artifactId: string;
+  s3Key: string;
+  versionId: string;
+  downloadUrl: string;
+  metadata: {
+    rowCount: number;
+    columnCount: number;
+    fileSize: number;
+    headers: string[];
+  };
+}
+
+export interface SpreadsheetVersion {
+  versionId: string;
+  timestamp: number;
+  isLatest: boolean;
+  size?: number;
+}
+
+export function createSpreadsheetArtifact(
+  payload: CreateSpreadsheetRequest,
+): Promise<SpreadsheetArtifactResponse> {
+  return request.post(endpoints.createSpreadsheetArtifact(), payload);
+}
+
+export function updateSpreadsheetArtifact(
+  artifactId: string,
+  payload: UpdateSpreadsheetRequest,
+): Promise<SpreadsheetArtifactResponse> {
+  return request.post(endpoints.updateSpreadsheetArtifact(artifactId), payload);
+}
+
+export function getSpreadsheetArtifact(
+  artifactId: string,
+  options?: { s3Key?: string; versionId?: string },
+): Promise<SpreadsheetArtifactResponse> {
+  const query = options
+    ? `?${Object.entries(options)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => `${k}=${encodeURIComponent(v as string)}`)
+        .join('&')}`
+    : '';
+  return request.get(`${endpoints.getSpreadsheetArtifact(artifactId)}${query}`);
+}
+
+export function listSpreadsheetVersions(artifactId: string): Promise<SpreadsheetVersion[]> {
+  return request.get(endpoints.listSpreadsheetVersions(artifactId));
+}
+
+export function restoreSpreadsheetVersion(
+  artifactId: string,
+  versionId: string,
+): Promise<SpreadsheetArtifactResponse> {
+  return request.post(endpoints.restoreSpreadsheetVersion(artifactId), { versionId });
+}
+
+export function deleteSpreadsheetArtifact(artifactId: string): Promise<{ success: boolean }> {
+  return request.delete(endpoints.deleteSpreadsheetArtifact(artifactId));
+}
+
+export function listSpreadsheetArtifacts(params?: {
+  limit?: number;
+  conversationId?: string;
+}): Promise<SpreadsheetArtifactResponse[]> {
+  const query = params
+    ? `?${Object.entries(params)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => `${k}=${v}`)
+        .join('&')}`
+    : '';
+  return request.get(`${endpoints.listSpreadsheetArtifacts()}${query}`);
+}
+
+export function updateSpreadsheetTitle(
+  artifactId: string,
+  title: string,
+): Promise<{ success: boolean }> {
+  return request.patch(endpoints.updateSpreadsheetTitle(artifactId), { title });
+}

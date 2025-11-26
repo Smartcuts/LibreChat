@@ -16,6 +16,28 @@ export interface Artifact {
   type?: string;
 }
 
+export interface ExcelSpreadsheetArtifact extends Artifact {
+  type: 'application/vnd.ms-excel';
+  data?: {
+    artifactId: string;
+    s3Key: string;
+    downloadUrl: string;
+    headers: string[];
+    rows: Array<Array<string | number | boolean | null>>;
+    metadata: {
+      sheetCount?: number;
+      rowCount: number;
+      columnCount: number;
+      currentVersionId?: string;
+      versions?: Array<{
+        versionId: string;
+        timestamp: number;
+        isLatest: boolean;
+      }>;
+    };
+  };
+}
+
 export type ArtifactFiles =
   | {
       'App.tsx': string;

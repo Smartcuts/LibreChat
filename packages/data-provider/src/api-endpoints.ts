@@ -392,3 +392,20 @@ export const adminConversationById = (id: string) =>
 
 export const adminUserSearch = (query: string, limit?: number) =>
   `${BASE_URL}/api/admin/users/search?q=${encodeURIComponent(query)}${limit ? `&limit=${limit}` : ''}`;
+
+/* Spreadsheet Artifact Endpoints */
+export const spreadsheetArtifact = () => `${BASE_URL}/api/spreadsheet-artifact`;
+export const createSpreadsheetArtifact = () => `${spreadsheetArtifact()}/create`;
+export const updateSpreadsheetArtifact = (artifactId: string) =>
+  `${spreadsheetArtifact()}/${artifactId}/update`;
+export const getSpreadsheetArtifact = (artifactId: string) => `${spreadsheetArtifact()}/${artifactId}`;
+export const listSpreadsheetVersions = (artifactId: string) =>
+  `${spreadsheetArtifact()}/${artifactId}/versions`;
+export const restoreSpreadsheetVersion = (artifactId: string) =>
+  `${spreadsheetArtifact()}/${artifactId}/restore`;
+export const downloadSpreadsheetVersion = (artifactId: string, versionId: string) =>
+  `${spreadsheetArtifact()}/${artifactId}/download/${versionId}`;
+export const deleteSpreadsheetArtifact = (artifactId: string) => `${spreadsheetArtifact()}/${artifactId}`;
+export const listSpreadsheetArtifacts = () => `${spreadsheetArtifact()}/list/all`;
+export const updateSpreadsheetTitle = (artifactId: string) =>
+  `${spreadsheetArtifact()}/${artifactId}/title`;

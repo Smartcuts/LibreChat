@@ -21,6 +21,7 @@ const roles = require('./roles');
 const oauth = require('./oauth');
 const files = require('./files');
 const share = require('./share');
+const spreadsheetArtifact = require('./spreadsheet-artifact');
 const tags = require('./tags');
 const auth = require('./auth');
 const edit = require('./edit');
@@ -40,6 +41,7 @@ module.exports = {
   oauth,
   files,
   share,
+  spreadsheetArtifact,
   admin,
   banner,
   agents,

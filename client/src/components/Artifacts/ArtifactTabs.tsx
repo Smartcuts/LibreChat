@@ -11,6 +11,8 @@ import { ArtifactCodeEditor } from './ArtifactCodeEditor';
 import { useGetStartupConfig } from '~/data-provider';
 import { ArtifactPreview } from './ArtifactPreview';
 import DataTableArtifact from './DataTableArtifact';
+import ExcelSpreadsheetArtifact from './ExcelSpreadsheetArtifact';
+import type { ExcelSpreadsheetArtifact as ExcelArtifact } from '~/common';
 import { cn } from '~/utils';
 
 export default function ArtifactTabs({
@@ -45,6 +47,9 @@ export default function ArtifactTabs({
   // Check if this is a data table artifact
   const isDataTable = artifact.type === 'application/vnd.data-table';
 
+  // Check if this is an Excel spreadsheet artifact
+  const isExcelSpreadsheet = artifact.type === 'application/vnd.ms-excel';
+
   if (isDataTable) {
     return (
       <>
@@ -53,6 +58,19 @@ export default function ArtifactTabs({
         </Tabs.Content>
         <Tabs.Content value="preview" className={cn('flex-grow overflow-auto')}>
           <DataTableArtifact artifact={artifact} />
+        </Tabs.Content>
+      </>
+    );
+  }
+
+  if (isExcelSpreadsheet) {
+    return (
+      <>
+        <Tabs.Content value="code" id="artifacts-code" className={cn('flex-grow overflow-auto')}>
+          <ExcelSpreadsheetArtifact artifact={artifact as ExcelArtifact} />
+        </Tabs.Content>
+        <Tabs.Content value="preview" className={cn('flex-grow overflow-auto')}>
+          <ExcelSpreadsheetArtifact artifact={artifact as ExcelArtifact} />
         </Tabs.Content>
       </>
     );

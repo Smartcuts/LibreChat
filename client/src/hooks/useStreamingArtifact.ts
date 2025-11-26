@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react';
 import { useSetRecoilState, useRecoilValue } from 'recoil';
 import type { Agents } from 'librechat-data-provider';
 import { artifactsState, currentArtifactId, artifactsVisibility } from '~/store/artifacts';
-import type { Artifact } from '~/common';
+import type { Artifact, ExcelSpreadsheetArtifact } from '~/common';
 
 interface DataTableArtifact extends Artifact {
   type: 'application/vnd.data-table';
@@ -145,6 +145,97 @@ export function useStreamingArtifact() {
     [setArtifacts],
   );
 
+  const createExcelArtifact = useCallback(
+    (params: {
+      title: string;
+      artifactId: string;
+      s3Key: string;
+      downloadUrl: string;
+      headers: string[];
+      rows: Array<Array<string | number | boolean | null>>;
+      messageId: string;
+      versionId?: string;
+      metadata?: {
+        rowCount: number;
+        columnCount: number;
+        sheetCount?: number;
+        currentVersionId?: string;
+      };
+    }) => {
+      const {
+        title,
+        artifactId,
+        s3Key,
+        downloadUrl,
+        headers,
+        rows,
+        messageId,
+        versionId,
+        metadata,
+      } = params;
+
+      const artifact: ExcelSpreadsheetArtifact = {
+        id: artifactId,
+        identifier: artifactId,
+        title,
+        type: 'application/vnd.ms-excel',
+        content: JSON.stringify({ headers, rows }, null, 2),
+        messageId,
+        lastUpdateTime: Date.now(),
+        data: {
+          artifactId,
+          s3Key,
+          downloadUrl,
+          headers,
+          rows,
+          metadata: {
+            rowCount: metadata?.rowCount || rows.length,
+            columnCount: metadata?.columnCount || headers.length,
+            sheetCount: metadata?.sheetCount || 1,
+            currentVersionId: versionId || metadata?.currentVersionId,
+          },
+        },
+      };
+
+      // Update artifacts state
+      setArtifacts((prev) => ({
+        ...prev,
+        [artifactId]: artifact,
+      }));
+
+      // Set as current artifact
+      setCurrentArtifactId(artifactId);
+
+      // Show artifacts panel
+      setArtifactsVisibility(true);
+
+      // Store the artifact ID for updates
+      artifactIdRef.current = artifactId;
+
+      return artifact;
+    },
+    [setArtifacts, setCurrentArtifactId, setArtifactsVisibility],
+  );
+
+  const updateExcelArtifact = useCallback(
+    (artifactId: string, updates: Partial<ExcelSpreadsheetArtifact>) => {
+      setArtifacts((prev) => {
+        const existing = prev?.[artifactId];
+        if (!existing) return prev;
+
+        return {
+          ...prev,
+          [artifactId]: {
+            ...existing,
+            ...updates,
+            lastUpdateTime: Date.now(),
+          },
+        };
+      });
+    },
+    [setArtifacts],
+  );
+
   const createArtifact = useCallback(
     (params: {
       type: string;
@@ -222,6 +313,8 @@ export function useStreamingArtifact() {
     updateArtifact,
     createDataArtifact,
     updateDataArtifact,
+    createExcelArtifact,
+    updateExcelArtifact,
     isArtifactOpen,
     resetArtifactRef,
     artifactIdRef,

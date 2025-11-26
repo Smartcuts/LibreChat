@@ -61,6 +61,10 @@ export enum QueryKeys {
   adminConversations = 'adminConversations',
   adminConversation = 'adminConversation',
   adminUserSearch = 'adminUserSearch',
+  /* Spreadsheet Artifacts */
+  spreadsheetArtifact = 'spreadsheetArtifact',
+  spreadsheetVersions = 'spreadsheetVersions',
+  spreadsheetList = 'spreadsheetList',
 }
 
 // Dynamic query keys that require parameters
