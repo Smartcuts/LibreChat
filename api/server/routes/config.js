@@ -146,6 +146,7 @@ router.get('/', async function (req, res) {
             startup: serverConfig?.startup,
             chatMenu: serverConfig?.chatMenu,
             isOAuth: serverConfig.requiresOAuth,
+            oauthRequired: serverConfig?.oauth?.required,
             customUserVars: serverConfig?.customUserVars,
             defaultSelected: serverConfig?.defaultSelected,
             oauthDescriptiveText: serverConfig?.oauth?.descriptive_text,

@@ -68,6 +68,12 @@ const BaseOptionsSchema = z.object({
       revocation_endpoint_auth_methods_supported: z.array(z.string()).optional(),
       /** Custom descriptive text shown in OAuth authorization prompt (e.g., "Connect with your Facebook account") */
       descriptive_text: z.string().optional(),
+      /**
+       * When true, users cannot send chat messages until they have completed
+       * OAuth authentication for this MCP server.
+       * This is useful for deployments where MCP functionality is required.
+       */
+      required: z.boolean().optional(),
     })
     .optional(),
   /** Custom headers to send with OAuth requests (registration, discovery, token exchange, etc.) */

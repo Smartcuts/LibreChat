@@ -18,8 +18,10 @@ import {
   useQueryParams,
   useSubmitMessage,
   useFocusChatEffect,
+  useMCPAuthRequirement,
 } from '~/hooks';
 import { mainTextareaId, BadgeItem } from '~/common';
+import { useGetStartupConfig } from '~/data-provider';
 import AttachFileChat from './Files/AttachFileChat';
 import FileFormChat from './Files/FileFormChat';
 import { cn, removeFocusRings } from '~/utils';
@@ -64,6 +66,8 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
   );
 
   const { requiresKey } = useRequiresKey();
+  const { data: startupConfig } = useGetStartupConfig();
+  const { isChatBlocked: mcpAuthRequired, pendingAuthServers } = useMCPAuthRequirement();
   const methods = useChatFormContext();
   const {
     files,
@@ -105,8 +109,8 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
     [conversation?.assistant_id, endpoint, assistantMap],
   );
   const disableInputs = useMemo(
-    () => requiresKey || invalidAssistant,
-    [requiresKey, invalidAssistant],
+    () => requiresKey || invalidAssistant || mcpAuthRequired,
+    [requiresKey, invalidAssistant, mcpAuthRequired],
   );
 
   const handleContainerClick = useCallback(() => {
@@ -251,6 +255,15 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
             )}
           >
             <TextareaHeader addedConvo={addedConvo} setAddedConvo={setAddedConvo} />
+            {mcpAuthRequired && pendingAuthServers.length > 0 && (
+              <div
+                role="alert"
+                className="mx-2 mt-2 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+              >
+                {startupConfig?.interface?.mcpServers?.auth_prompt_text ??
+                  localize('com_ui_mcp_auth_required', { 0: pendingAuthServers.join(', ') })}
+              </div>
+            )}
             <EditBadges
               isEditingChatBadges={isEditingBadges}
               handleCancelBadges={handleCancelBadges}

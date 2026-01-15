@@ -680,6 +680,8 @@ export type TStartupConfig = {
       startup?: boolean;
       defaultSelected?: boolean;
       oauthDescriptiveText?: string;
+      /** When true, users cannot send chat messages until they have completed OAuth for this server */
+      oauthRequired?: boolean;
     }
   >;
   mcpPlaceholder?: string;
