@@ -389,3 +389,13 @@ export interface CancelMCPOAuthResponse {
   success: boolean;
   message: string;
 }
+
+export interface MCPUserChoiceResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface MCPUserChoiceRequest {
+  flowId: string;
+  selection: string | null;
+}

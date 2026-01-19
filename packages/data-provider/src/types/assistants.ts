@@ -466,6 +466,8 @@ export type PartMetadata = {
   action?: boolean;
   auth?: string;
   expires_at?: number;
+  /** User choice request for interactive tool calls */
+  user_choice?: Agents.ToolCall['user_choice'];
 };
 
 export type ContentPart = (

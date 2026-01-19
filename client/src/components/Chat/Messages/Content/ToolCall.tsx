@@ -2,7 +2,9 @@ import { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Button } from '@librechat/client';
 import { TriangleAlert } from 'lucide-react';
 import { actionDelimiter, actionDomainSeparator, Constants } from 'librechat-data-provider';
-import type { TAttachment } from 'librechat-data-provider';
+import { useSubmitMCPUserChoiceMutation } from 'librechat-data-provider/react-query';
+import type { TAttachment, Agents } from 'librechat-data-provider';
+import MCPUserChoiceDialog from '~/components/MCP/MCPUserChoiceDialog';
 import { useLocalize, useProgress } from '~/hooks';
 import { AttachmentGroup } from './Parts';
 import ToolCallInfo from './ToolCallInfo';
@@ -18,6 +20,7 @@ export default function ToolCall({
   output,
   attachments,
   auth,
+  user_choice,
 }: {
   initialProgress: number;
   isLast?: boolean;
@@ -28,6 +31,7 @@ export default function ToolCall({
   attachments?: TAttachment[];
   auth?: string;
   expires_at?: number;
+  user_choice?: Agents.ToolCall['user_choice'];
 }) {
   const localize = useLocalize();
   const [showInfo, setShowInfo] = useState(false);
@@ -35,6 +39,50 @@ export default function ToolCall({
   const [contentHeight, setContentHeight] = useState<number | undefined>(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const prevShowInfoRef = useRef<boolean>(showInfo);
+
+  // User choice modal state
+  const [isUserChoiceOpen, setIsUserChoiceOpen] = useState(false);
+  const [userChoiceSubmitted, setUserChoiceSubmitted] = useState(false);
+  const submitUserChoiceMutation = useSubmitMCPUserChoiceMutation();
+
+  // Auto-open user choice dialog when user_choice is present and not yet submitted
+  useEffect(() => {
+    if (user_choice && user_choice.flowId && !userChoiceSubmitted && !output) {
+      setIsUserChoiceOpen(true);
+    }
+  }, [user_choice, userChoiceSubmitted, output]);
+
+  const handleUserChoiceSubmit = async (selection: string) => {
+    if (!user_choice?.flowId) {
+      return;
+    }
+    try {
+      await submitUserChoiceMutation.mutateAsync({
+        flowId: user_choice.flowId,
+        selection,
+      });
+      setUserChoiceSubmitted(true);
+      setIsUserChoiceOpen(false);
+    } catch (error) {
+      logger.error('Failed to submit user choice:', error);
+    }
+  };
+
+  const handleUserChoiceCancel = async () => {
+    if (!user_choice?.flowId || user_choice.required) {
+      return;
+    }
+    try {
+      await submitUserChoiceMutation.mutateAsync({
+        flowId: user_choice.flowId,
+        selection: null,
+      });
+      setUserChoiceSubmitted(true);
+      setIsUserChoiceOpen(false);
+    } catch (error) {
+      logger.error('Failed to cancel user choice:', error);
+    }
+  };
 
   const { function_name, domain, isMCPToolCall } = useMemo(() => {
     if (typeof name !== 'string') {
@@ -252,6 +300,20 @@ export default function ToolCall({
         </div>
       )}
       {attachments && attachments.length > 0 && <AttachmentGroup attachments={attachments} />}
+      {user_choice && user_choice.flowId && (
+        <MCPUserChoiceDialog
+          isOpen={isUserChoiceOpen}
+          onOpenChange={setIsUserChoiceOpen}
+          pendingChoice={{
+            flowId: user_choice.flowId,
+            toolCallId: name,
+            userChoice: user_choice,
+          }}
+          onSubmit={handleUserChoiceSubmit}
+          onCancel={handleUserChoiceCancel}
+          isSubmitting={submitUserChoiceMutation.isLoading}
+        />
+      )}
     </>
   );
 }

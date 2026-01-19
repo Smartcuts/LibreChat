@@ -166,6 +166,10 @@ export const cancelMCPOAuth = (serverName: string) => {
   return `${BASE_URL}/api/mcp/oauth/cancel/${serverName}`;
 };
 
+export const mcpUserChoice = (flowId: string) => {
+  return `${BASE_URL}/api/mcp/user-choice/${encodeURIComponent(flowId)}`;
+};
+
 export const config = () => `${BASE_URL}/api/config`;
 
 export const prompts = () => `${BASE_URL}/api/prompts`;

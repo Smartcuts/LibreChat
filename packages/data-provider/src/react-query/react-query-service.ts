@@ -362,6 +362,17 @@ export const useCancelMCPOAuthMutation = (): UseMutationResult<
   });
 };
 
+export const useSubmitMCPUserChoiceMutation = (): UseMutationResult<
+  m.MCPUserChoiceResponse,
+  unknown,
+  m.MCPUserChoiceRequest,
+  unknown
+> => {
+  return useMutation(({ flowId, selection }: m.MCPUserChoiceRequest) =>
+    dataService.submitMCPUserChoice(flowId, selection),
+  );
+};
+
 export const useGetCustomConfigSpeechQuery = (
   config?: UseQueryOptions<t.TCustomConfigSpeechResponse>,
 ): QueryObserverResult<t.TCustomConfigSpeechResponse> => {

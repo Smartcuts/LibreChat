@@ -20,7 +20,12 @@ const {
   ContentTypes,
   isAssistantsEndpoint,
 } = require('librechat-data-provider');
-const { getMCPManager, getFlowStateManager, getOAuthReconnectionManager } = require('~/config');
+const {
+  getMCPManager,
+  getFlowStateManager,
+  getUserChoiceFlowManager,
+  getOAuthReconnectionManager,
+} = require('~/config');
 const { findToken, createToken, updateToken } = require('~/models');
 const { reinitMCPServer } = require('./Tools/mcp');
 const { getAppConfig } = require('./Config');
@@ -121,6 +126,186 @@ function createOAuthEnd({ res, stepId, toolCall }) {
     sendEvent(res, { event: GraphEvents.ON_RUN_STEP_DELTA, data });
     logger.debug('Sent OAuth login success to client');
   };
+}
+
+/**
+ * Creates a function to emit user choice request events to the client.
+ * @param {object} params
+ * @param {ServerResponse} params.res - The Express response object for sending events.
+ * @param {string} params.stepId - The ID of the step in the flow.
+ * @param {string} params.flowId - The flow ID for submitting the user's response.
+ * @param {ToolCallChunk} params.toolCall - The tool call object containing tool information.
+ */
+function createUserChoiceDeltaEmitter({ res, stepId, flowId, toolCall }) {
+  /**
+   * @param {Object} userChoice - The user choice configuration.
+   * @param {string} userChoice.prompt - The prompt to display to the user.
+   * @param {Array<{label: string, value: string, description?: string}>} userChoice.options - The options for the user to choose from.
+   * @param {boolean} [userChoice.required] - Whether the user must select an option.
+   * @returns {void}
+   */
+  return function (userChoice) {
+    /** @type {{ id: string; delta: AgentToolCallDelta }} */
+    const data = {
+      id: stepId,
+      delta: {
+        type: StepTypes.TOOL_CALLS,
+        tool_calls: [{ ...toolCall, args: '' }],
+        user_choice: {
+          ...userChoice,
+          flowId, // Include flowId so frontend can submit response to /api/mcp/user-choice/:flowId
+          toolCallId: toolCall?.id, // Include toolCallId for frontend reference
+          stepId, // Include stepId for frontend reference
+        },
+        expires_at: Date.now() + Time.ONE_HOUR,
+      },
+    };
+    sendEvent(res, { event: GraphEvents.ON_RUN_STEP_DELTA, data });
+  };
+}
+
+/**
+ * Creates a function to start a user choice flow and wait for user response.
+ * @param {object} params
+ * @param {string} params.flowId - The ID of the choice flow.
+ * @param {FlowStateManager<any>} params.flowManager - The flow manager instance.
+ * @param {(userChoice: Object) => void} [params.callback] - Callback to emit the user choice event.
+ */
+function createUserChoiceStart({ flowId, flowManager, callback }) {
+  /**
+   * Initiates the user choice flow.
+   * @param {Object} userChoice - The user choice configuration.
+   * @returns {Promise<string|null>} The user's selection or null if cancelled.
+   */
+  return async function (userChoice) {
+    // Emit the SSE event to show the modal on the frontend
+    callback?.(userChoice);
+    logger.info('[MCP] Sent user choice request to client, waiting for user response...', { flowId });
+
+    try {
+      // createFlow creates a PENDING flow and monitors it until completed externally
+      // The API endpoint will call completeFlow when user submits their selection
+      const userResponse = await flowManager.createFlow(flowId, 'user_choice', { userChoice });
+      logger.info('[MCP] User choice received:', { flowId, userResponse });
+      return userResponse;
+    } catch (error) {
+      logger.error('[MCP] Error in user choice flow:', error);
+      // If flow times out or fails, return null (will be treated as cancellation)
+      return null;
+    }
+  };
+}
+
+/**
+ * Creates a function to handle user choice flow completion.
+ * @param {object} params
+ * @param {ServerResponse} params.res - The Express response object for sending events.
+ * @param {string} params.stepId - The ID of the step in the flow.
+ * @param {ToolCallChunk} params.toolCall - The tool call object containing tool information.
+ */
+function createUserChoiceEnd({ res, stepId, toolCall }) {
+  return async function (userResponse) {
+    /** @type {{ id: string; delta: AgentToolCallDelta }} */
+    const data = {
+      id: stepId,
+      delta: {
+        type: StepTypes.TOOL_CALLS,
+        tool_calls: [{ ...toolCall, user_response: userResponse }],
+      },
+    };
+    sendEvent(res, { event: GraphEvents.ON_RUN_STEP_DELTA, data });
+    logger.debug('[MCP] Sent user choice completion to client');
+  };
+}
+
+/**
+ * Checks if an MCP tool result contains a user choice request.
+ * formatToolContent returns [FormattedContent[] | string, Artifacts] tuple.
+ * @param {unknown} result - The result from an MCP tool call (after formatToolContent).
+ * @returns {{ hasUserChoice: boolean, userChoice?: Object }} Whether the result requires user choice.
+ */
+function checkForUserChoice(result) {
+  if (!result) {
+    return { hasUserChoice: false };
+  }
+
+  logger.info('[MCP] Checking for user choice in result:', {
+    resultType: typeof result,
+    isArray: Array.isArray(result),
+    result: JSON.stringify(result).slice(0, 500),
+  });
+
+  // formatToolContent returns [FormattedContent[] | string, Artifacts]
+  // Extract the content from the tuple
+  let contentItems = result;
+
+  if (Array.isArray(result)) {
+    const firstElement = result[0];
+    if (Array.isArray(firstElement)) {
+      // Content array providers return: [[{ type: 'text', text: '...' }], artifacts]
+      contentItems = firstElement;
+      logger.debug('[MCP] Unwrapped content array from tuple[0]');
+    } else if (typeof firstElement === 'string') {
+      // String format for non-content-array providers: ['text content', artifacts]
+      contentItems = [{ type: 'text', text: firstElement }];
+      logger.debug('[MCP] Wrapped string content from tuple[0]');
+    }
+  }
+
+  // Handle MCP result with content wrapper: { content: [...] }
+  if (contentItems && typeof contentItems === 'object' && Array.isArray(contentItems.content)) {
+    contentItems = contentItems.content;
+    logger.debug('[MCP] Unwrapped content array from result.content');
+  }
+
+  // Now contentItems should be an array of content parts
+  const content = Array.isArray(contentItems) ? contentItems[0] : contentItems;
+
+  // MCP content format: { type: "text", text: "..." } or { type: "json", data: {...} }
+  let parsed = content;
+  if (content && typeof content === 'object') {
+    // Handle MCP text content that might contain JSON
+    if (content.type === 'text' && typeof content.text === 'string') {
+      try {
+        const jsonParsed = JSON.parse(content.text);
+        if (jsonParsed && typeof jsonParsed === 'object') {
+          parsed = jsonParsed;
+          logger.debug('[MCP] Parsed JSON from text content');
+        }
+      } catch {
+        // Not JSON, continue with original content
+      }
+    }
+
+    // Handle MCP json content type
+    if (content.type === 'json' && content.data) {
+      parsed = content.data;
+      logger.debug('[MCP] Extracted data from json content type');
+    }
+  }
+
+  // Check for user_choice in the parsed content
+  if (parsed && typeof parsed === 'object' && parsed.user_choice) {
+    logger.debug('[MCP] Found user_choice in result', { userChoice: parsed.user_choice });
+    return {
+      hasUserChoice: true,
+      userChoice: parsed.user_choice,
+      originalResult: parsed,
+    };
+  }
+
+  // Check if the result itself is a user_choice object (has prompt and options)
+  if (parsed && typeof parsed === 'object' && parsed.prompt && Array.isArray(parsed.options)) {
+    logger.debug('[MCP] Result itself is a user_choice object');
+    return {
+      hasUserChoice: true,
+      userChoice: parsed,
+      originalResult: parsed,
+    };
+  }
+
+  logger.debug('[MCP] No user_choice found in result');
+  return { hasUserChoice: false };
 }
 
 /**
@@ -230,6 +415,7 @@ async function createMCPTools({ res, user, index, signal, serverName, provider, 
   }
 
   const serverTools = [];
+  logger.warn('[MCP] createMCPTools');
   for (const tool of result.tools) {
     const toolInstance = await createMCPTool({
       res,
@@ -271,6 +457,7 @@ async function createMCPTool({
   userMCPAuthMap,
   availableTools,
 }) {
+  logger.info(`[MCP] createMCPTool called for toolKey: ${toolKey}`);
   const [toolName, serverName] = toolKey.split(Constants.mcp_delimiter);
 
   /** @type {LCTool | undefined} */
@@ -321,6 +508,11 @@ function createToolInstance({ res, toolName, serverName, toolDefinition, provide
 
   /** @type {(toolArguments: Object | string, config?: GraphRunnableConfig) => Promise<unknown>} */
   const _call = async (toolArguments, config) => {
+    logger.info(`[MCP][${serverName}][${toolName}] _call invoked`, {
+      hasConfig: !!config,
+      hasRes: !!res,
+    });
+
     const userId = config?.configurable?.user?.id || config?.configurable?.user_id;
     /** @type {ReturnType<typeof createAbortHandler>} */
     let abortHandler = null;
@@ -347,6 +539,26 @@ function createToolInstance({ res, toolName, serverName, toolDefinition, provide
         callback: runStepDeltaEmitter,
       });
       const oauthEnd = createOAuthEnd({
+        res,
+        stepId,
+        toolCall,
+      });
+
+      // User choice flow setup - use separate flow manager with longer TTL (1 hour)
+      const userChoiceFlowManager = getUserChoiceFlowManager(flowsCache);
+      const userChoiceFlowId = `${serverName}:user_choice:${config.metadata.thread_id}:${config.metadata.run_id}:${toolCall?.id}`;
+      const userChoiceDeltaEmitter = createUserChoiceDeltaEmitter({
+        res,
+        stepId,
+        flowId: userChoiceFlowId,
+        toolCall,
+      });
+      const userChoiceStart = createUserChoiceStart({
+        flowId: userChoiceFlowId,
+        flowManager: userChoiceFlowManager,
+        callback: userChoiceDeltaEmitter,
+      });
+      const userChoiceEnd = createUserChoiceEnd({
         res,
         stepId,
         toolCall,
@@ -407,6 +619,58 @@ function createToolInstance({ res, toolName, serverName, toolDefinition, provide
         oauthStart,
         oauthEnd,
       });
+
+      logger.info(
+        `[MCP][${serverName}][${toolName}] Tool call returned, checking for user_choice`,
+        {
+          hasResult: !!result,
+          resultType: typeof result,
+          isArray: Array.isArray(result),
+          resultPreview: JSON.stringify(result).slice(0, 300),
+        },
+      );
+
+      // Check if the result contains a user choice request
+      const { hasUserChoice, userChoice } = checkForUserChoice(result);
+      logger.info(`[MCP][${serverName}][${toolName}] checkForUserChoice result`, {
+        hasUserChoice,
+        userChoice: userChoice ? JSON.stringify(userChoice).slice(0, 200) : null,
+      });
+
+      if (hasUserChoice && userChoice) {
+        logger.info(`[MCP][${serverName}][${toolName}] Tool returned user choice request`, {
+          prompt: userChoice.prompt,
+          optionsCount: userChoice.options?.length,
+        });
+
+        // Wait for user response - this will block until user makes a selection
+        // The frontend will show a modal and submit the selection via API
+        const userResponse = await userChoiceStart(userChoice);
+        logger.info(`[MCP][${serverName}][${toolName}] User choice response received`, {
+          userResponse,
+        });
+
+        if (userResponse === null) {
+          // User cancelled (for non-required choices)
+          if (userChoice.required) {
+            throw new Error(
+              `[MCP][${serverName}][${toolName}] User choice was required but not provided.`,
+            );
+          }
+          // Return cancellation in proper tuple format
+          return [[{ type: 'text', text: 'User cancelled the selection.' }], result[1]];
+        }
+
+        // Emit the completion event
+        await userChoiceEnd(userResponse);
+
+        // Return the user's selection in proper tuple format with both label and id
+        const selectedOption = userChoice.options?.find((opt) => opt.value === userResponse);
+        const responseText = selectedOption
+          ? `User selected: ${selectedOption.label} (${selectedOption.value})`
+          : `User selected: ${userResponse}`;
+        return [[{ type: 'text', text: responseText }], result[1]];
+      }
 
       if (isAssistantsEndpoint(provider) && Array.isArray(result)) {
         return result[0];
@@ -594,10 +858,35 @@ async function getServerConnectionStatus(
   };
 }
 
+/**
+ * Completes a user choice flow with the user's selection.
+ * @param {string} flowId - The flow ID for the user choice.
+ * @param {string|null} userResponse - The user's selection, or null if cancelled.
+ * @returns {Promise<boolean>} Whether the flow was completed successfully.
+ */
+async function completeUserChoice(flowId, userResponse) {
+  const flowsCache = getLogStores(CacheKeys.FLOWS);
+  const flowManager = getUserChoiceFlowManager(flowsCache);
+
+  try {
+    const completed = await flowManager.completeFlow(flowId, 'user_choice', userResponse);
+    if (completed) {
+      logger.debug('[MCP] User choice flow completed:', { flowId, userResponse });
+      return true;
+    }
+    logger.warn('[MCP] User choice flow not found or already completed:', { flowId });
+    return false;
+  } catch (error) {
+    logger.error('[MCP] Error completing user choice flow:', { flowId, error });
+    return false;
+  }
+}
+
 module.exports = {
   createMCPTool,
   createMCPTools,
   getMCPSetupData,
+  completeUserChoice,
   checkOAuthFlowStatus,
   getServerConnectionStatus,
 };

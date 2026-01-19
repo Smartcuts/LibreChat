@@ -166,6 +166,7 @@ const Part = memo(
             attachments={attachments}
             auth={toolCall.auth}
             expires_at={toolCall.expires_at}
+            user_choice={toolCall.user_choice}
             isLast={isLast}
           />
         );

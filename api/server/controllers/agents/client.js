@@ -46,7 +46,7 @@ const { checkCapability } = require('~/server/services/Config');
 const BaseClient = require('~/app/clients/BaseClient');
 const { getRoleByName } = require('~/models/Role');
 const { loadAgent } = require('~/models/Agent');
-const { getMCPManager } = require('~/config');
+const { getMCPManager, getGraphCheckpointer } = require('~/config');
 
 const omitTitleOptions = new Set([
   'stream',
@@ -865,6 +865,9 @@ class AgentClient extends BaseClient {
           customHandlers: this.options.eventHandlers,
           requestBody: config.configurable.requestBody,
           tokenCounter: createTokenCounter(this.getEncoding()),
+          compileOptions: {
+            checkpointer: getGraphCheckpointer(),
+          },
         });
 
         if (!run) {

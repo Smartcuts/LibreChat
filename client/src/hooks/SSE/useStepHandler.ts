@@ -185,6 +185,7 @@ export default function useStepHandler({
         type: ToolCallTypes.TOOL_CALL,
         auth: contentPart.tool_call.auth,
         expires_at: contentPart.tool_call.expires_at,
+        user_choice: contentPart.tool_call.user_choice,
       };
 
       if (finalUpdate) {
@@ -555,6 +556,11 @@ export default function useStepHandler({
 
             if (runStepDelta.delta.auth != null) {
               contentPart.tool_call.auth = runStepDelta.delta.auth;
+              contentPart.tool_call.expires_at = runStepDelta.delta.expires_at;
+            }
+
+            if (runStepDelta.delta.user_choice != null) {
+              contentPart.tool_call.user_choice = runStepDelta.delta.user_choice;
               contentPart.tool_call.expires_at = runStepDelta.delta.expires_at;
             }
 

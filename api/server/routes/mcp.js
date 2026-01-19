@@ -9,7 +9,11 @@ const {
   mcpServersRegistry,
 } = require('@librechat/api');
 const { getMCPManager, getFlowStateManager, getOAuthReconnectionManager } = require('~/config');
-const { getMCPSetupData, getServerConnectionStatus } = require('~/server/services/MCP');
+const {
+  getMCPSetupData,
+  completeUserChoice,
+  getServerConnectionStatus,
+} = require('~/server/services/MCP');
 const { findToken, updateToken, createToken, deleteTokens } = require('~/models');
 const { getUserPluginAuthValue } = require('~/server/services/PluginService');
 const { updateMCPServerTools } = require('~/server/services/Config/mcp');
@@ -345,6 +349,49 @@ router.post('/oauth/cancel/:serverName', requireJwtAuth, async (req, res) => {
   } catch (error) {
     logger.error('[MCP OAuth Cancel] Failed to cancel OAuth flow', error);
     res.status(500).json({ error: 'Failed to cancel OAuth flow' });
+  }
+});
+
+/**
+ * Complete a user choice flow
+ * This endpoint is called when the user selects an option from the choice modal
+ */
+router.post('/user-choice/:flowId', requireJwtAuth, async (req, res) => {
+  try {
+    const { flowId } = req.params;
+    const { selection } = req.body;
+    const user = req.user;
+
+    if (!user?.id) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Validate that the flow ID belongs to this user's conversation
+    if (!flowId || typeof flowId !== 'string') {
+      return res.status(400).json({ error: 'Invalid flow ID' });
+    }
+
+    logger.debug('[MCP User Choice] Completing user choice flow', {
+      flowId,
+      selection,
+      userId: user.id,
+    });
+
+    const success = await completeUserChoice(flowId, selection ?? null);
+
+    if (success) {
+      res.json({
+        success: true,
+        message: 'User choice submitted successfully',
+      });
+    } else {
+      res.status(404).json({
+        error: 'User choice flow not found or already completed',
+      });
+    }
+  } catch (error) {
+    logger.error('[MCP User Choice] Failed to complete user choice', error);
+    res.status(500).json({ error: 'Failed to submit user choice' });
   }
 });
 

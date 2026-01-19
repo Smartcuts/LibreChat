@@ -167,6 +167,13 @@ export function cancelMCPOAuth(serverName: string): Promise<m.CancelMCPOAuthResp
   return request.post(endpoints.cancelMCPOAuth(serverName), {});
 }
 
+export function submitMCPUserChoice(
+  flowId: string,
+  selection: string | null,
+): Promise<m.MCPUserChoiceResponse> {
+  return request.post(endpoints.mcpUserChoice(flowId), { selection });
+}
+
 /* Config */
 
 export const getStartupConfig = (): Promise<

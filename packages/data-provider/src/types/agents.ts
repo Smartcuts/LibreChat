@@ -66,6 +66,26 @@ export namespace Agents {
     auth?: string;
     /** Expiration time */
     expires_at?: number;
+    /** User choice request - when present, tool execution is paused awaiting user selection */
+    user_choice?: {
+      /** Prompt text to display to the user */
+      prompt: string;
+      /** Available options for the user to choose from */
+      options: Array<{
+        /** Display label for the option */
+        label: string;
+        /** Value to return when selected */
+        value: string;
+        /** Optional description providing more context */
+        description?: string;
+      }>;
+      /** If true, user must select an option; if false, they can cancel */
+      required?: boolean;
+      /** Flow ID for submitting the user's response */
+      flowId?: string;
+    };
+    /** User's response to a user_choice request */
+    user_response?: string;
     /** Streaming data for progressive tool results */
     streaming_data?: {
       mimeType?: string;
@@ -213,6 +233,8 @@ export namespace Agents {
     tool_calls?: ToolCallChunk[];
     auth?: string;
     expires_at?: number;
+    /** User choice request for interactive tool calls */
+    user_choice?: ToolCall['user_choice'];
   };
   export type AgentToolCall = FunctionToolCall | ToolCall;
   export interface ExtendedMessageContent {

@@ -4,6 +4,7 @@ import type {
   MultiAgentGraphConfig,
   OpenAIClientOptions,
   StandardGraphConfig,
+  CompileOptions,
   AgentInputs,
   GenericTool,
   RunConfig,
@@ -69,6 +70,7 @@ export async function createRun({
   tokenCounter,
   customHandlers,
   indexTokenCountMap,
+  compileOptions,
   streaming = true,
   streamUsage = true,
 }: {
@@ -78,6 +80,7 @@ export async function createRun({
   streaming?: boolean;
   streamUsage?: boolean;
   requestBody?: t.RequestBody;
+  compileOptions?: CompileOptions;
 } & Pick<RunConfig, 'tokenCounter' | 'customHandlers' | 'indexTokenCountMap'>): Promise<
   Run<IState>
 > {
@@ -153,6 +156,7 @@ export async function createRun({
     signal,
     agents: agentInputs,
     edges: agents[0].edges,
+    compileOptions,
   };
 
   if (agentInputs.length > 1 || ((graphConfig as MultiAgentGraphConfig).edges?.length ?? 0) > 0) {
