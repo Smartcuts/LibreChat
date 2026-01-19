@@ -7,6 +7,38 @@ const { logger } = require('@librechat/data-schemas');
 const { logAxiosError, isEnabled, readFileAsString } = require('@librechat/api');
 
 /**
+ * Converts HTML to plain text for multipart/alternative emails.
+ * @param {string} html - The HTML content to convert.
+ * @returns {string} - Plain text version.
+ */
+function htmlToPlainText(html) {
+  return html
+    // Remove style/script blocks
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    // Remove HTML comments (including conditional comments)
+    .replace(/<!--[\s\S]*?-->/g, '')
+    // Convert links to text with URL
+    .replace(/<a[^>]*href=["']([^"']+)["'][^>]*>([^<]*)<\/a>/gi, '$2 ($1)')
+    // Convert block elements to newlines
+    .replace(/<(br|hr|p|div|tr|li|h[1-6])[^>]*>/gi, '\n')
+    // Remove all remaining HTML tags
+    .replace(/<[^>]+>/g, '')
+    // Decode common HTML entities
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&copy;/g, '(c)')
+    // Normalize whitespace
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n/g, '\n\n')
+    .trim();
+}
+
+/**
  * Sends an email using Mailgun API.
  *
  * @async
@@ -16,9 +48,10 @@ const { logAxiosError, isEnabled, readFileAsString } = require('@librechat/api')
  * @param {string} params.from - The sender's email address.
  * @param {string} params.subject - The subject of the email.
  * @param {string} params.html - The HTML content of the email.
+ * @param {string} params.text - The plain text content of the email.
  * @returns {Promise<Object>} - A promise that resolves to the response from Mailgun API.
  */
-const sendEmailViaMailgun = async ({ to, from, subject, html }) => {
+const sendEmailViaMailgun = async ({ to, from, subject, html, text }) => {
   const mailgunApiKey = process.env.MAILGUN_API_KEY;
   const mailgunDomain = process.env.MAILGUN_DOMAIN;
   const mailgunHost = process.env.MAILGUN_HOST || 'https://api.mailgun.net';
@@ -31,8 +64,11 @@ const sendEmailViaMailgun = async ({ to, from, subject, html }) => {
   formData.append('from', from);
   formData.append('to', to);
   formData.append('subject', subject);
+  formData.append('text', text);
   formData.append('html', html);
   formData.append('o:tracking-clicks', 'no');
+  formData.append('o:tracking-opens', 'no');
+  formData.append('o:require-tls', 'true');
 
   try {
     const response = await axios.post(`${mailgunHost}/v3/${mailgunDomain}/messages`, formData, {
@@ -95,12 +131,13 @@ const sendEmail = async ({ email, subject, payload, template, throwError = true 
     const { content: source } = await readFileAsString(path.join(__dirname, 'emails', template));
     const compiledTemplate = handlebars.compile(source);
     const html = compiledTemplate(payload);
+    const text = htmlToPlainText(html);
 
     // Prepare common email data
     const fromName = process.env.EMAIL_FROM_NAME || process.env.APP_TITLE;
     const fromEmail = process.env.EMAIL_FROM;
     const fromAddress = `"${fromName}" <${fromEmail}>`;
-    const toAddress = `"${payload.name}" <${email}>`;
+    const toAddress = payload.name ? `"${payload.name}" <${email}>` : email;
 
     // Check if Mailgun is configured
     if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
@@ -110,6 +147,7 @@ const sendEmail = async ({ email, subject, payload, template, throwError = true 
         to: toAddress,
         subject: subject,
         html: html,
+        text: text,
       });
     }
 
@@ -154,6 +192,7 @@ const sendEmail = async ({ email, subject, payload, template, throwError = true 
         to: email,
       },
       subject: subject,
+      text: text,
       html: html,
     };
 
